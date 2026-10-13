@@ -35,6 +35,10 @@ funcionar sin servidor.
   no hay migraciones de datos.
 - `fecha` es timestamp de época (`Date.now()`); la lista se ordena del más reciente
   al más antiguo (ver skill `local-dates` al tocar fechas).
+- Claves de acceso (spec 006): `gestorAcceso` (localStorage, hashes SHA-256
+  `{ usuario, administrador }`, opcional), `gestorSesion` (sessionStorage, rol) y
+  `gestorSesionPersistente` (localStorage, rol). Claves por defecto **2468** (usuario) y
+  **9753** (administrador): el administrador debe cambiarlas en «Herramientas».
 - Nunca se cambia la clave ni el esquema sin actualizar `docs/constitution.md` y los tests.
 
 ## Funcionalidades implementadas
@@ -56,6 +60,13 @@ funcionar sin servidor.
 - **Diseño retro (spec 003)**: paleta de materiales (índigo Tela, mostaza Espuma,
   acero Estructuras), banda tricolor, espina de color por tarjeta, tinta `#1d241f`,
   sin sombras.
+- **Acceso con clave y permisos (spec 006)**: al abrir hay una pantalla de clave con dos
+  perfiles — **usuario** (añade, edita, busca y filtra) y **administrador** (además borra,
+  exporta, importa y cambia las claves). Las claves se guardan **solo como hash
+  SHA-256** (nunca en claro); la sesión vive en `sessionStorage` (o `localStorage` si se
+  marca «mantener sesión iniciada») y «Salir» la cierra. La exportación descarga
+  `clientes-AAAA-MM-DD.json` y la importación reemplaza los datos tras confirmar. Es una
+  protección **disuasoria** (la app funciona sin servidor, RF-409).
 
 ## Forma de trabajar (SDD)
 

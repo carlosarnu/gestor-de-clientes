@@ -151,6 +151,69 @@ function buscarClientes(lista, consulta) {
   });
 }
 
+// =====================================================
+// Acceso con clave y permisos (spec 006) - sin DOM
+// =====================================================
+
+// SHA-256 en hexadecimal de un texto (WebCrypto, nativo, sin librerías)
+async function hashTexto(texto) {
+  const datos = new TextEncoder().encode(texto);
+  const buffer = await crypto.subtle.digest("SHA-256", datos);
+  return Array.from(new Uint8Array(buffer))
+    .map(function (byte) { return byte.toString(16).padStart(2, "0"); })
+    .join("");
+}
+
+// Solo el administrador puede borrar, exportar e importar
+function esAdmin(rol) {
+  return rol === "administrador";
+}
+
+// Valida un archivo de importación: acepta array o { clientes: [...] }.
+// Devuelve { ok, clientes, error } y filtra los items sin empresa (RF-407).
+function validarImportacion(datos) {
+  let crudo = datos;
+  if (!Array.isArray(crudo) && crudo && Array.isArray(crudo.clientes)) {
+    crudo = crudo.clientes;
+  }
+  if (!Array.isArray(crudo)) {
+    return { ok: false, clientes: [], error: "El archivo no contiene una lista de clientes." };
+  }
+
+  const clientes = crudo
+    .filter(function (item) {
+      return item && typeof item === "object" && texto(item.empresa) !== "";
+    })
+    .map(function (item, indice) {
+      return {
+        id: typeof item.id === "number" ? item.id : Date.now() + indice,
+        fecha: typeof item.fecha === "number" ? item.fecha : Date.now(),
+        empresa: texto(item.empresa),
+        cif: texto(item.cif),
+        contacto: texto(item.contacto),
+        telefono: texto(item.telefono),
+        email: texto(item.email),
+        direccion: texto(item.direccion),
+        tipo: texto(item.tipo),
+        notas: texto(item.notas)
+      };
+    });
+
+  if (clientes.length === 0) {
+    return { ok: false, clientes: [], error: "El archivo no tiene ningún cliente válido." };
+  }
+  return { ok: true, clientes: clientes, error: "" };
+}
+
+// Nombre del archivo exportado con la fecha LOCAL del equipo (skill local-dates):
+// p. ej. clientes-2026-10-13.json
+function nombreArchivoExportacion(fecha) {
+  const anio = fecha.getFullYear();
+  const mes = String(fecha.getMonth() + 1).padStart(2, "0");
+  const dia = String(fecha.getDate()).padStart(2, "0");
+  return "clientes-" + anio + "-" + mes + "-" + dia + ".json";
+}
+
 // En Node (tests) exportamos las funciones; en el navegador no existe `module` y se omite.
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
@@ -171,6 +234,10 @@ if (typeof module !== "undefined" && module.exports) {
     contenidoMapa,
     nombreTipo,
     normalizar,
-    buscarClientes
+    buscarClientes,
+    hashTexto,
+    esAdmin,
+    validarImportacion,
+    nombreArchivoExportacion
   };
 }

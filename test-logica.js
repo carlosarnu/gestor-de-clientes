@@ -23,8 +23,17 @@ const {
   contenidoMapa,
   nombreTipo,
   normalizar,
-  buscarClientes
+  buscarClientes,
+  hashTexto,
+  esAdmin,
+  validarImportacion,
+  nombreArchivoExportacion
 } = require("./logica.js");
+
+// WebCrypto por si el Node de turnos no lo trae global (no afecta al navegador)
+if (typeof globalThis.crypto === "undefined") {
+  globalThis.crypto = require("node:crypto").webcrypto;
+}
 
 // Ayuda: un formulario falso con la interfaz de FormData (.get)
 function formulario(valores) {
@@ -245,4 +254,55 @@ test("buscarClientes encuentra por tipo con «espuma» y con «foam» (RF-301/RF
 test("buscarClientes sin coincidencias devuelve vacía y no muta la lista (RF-302)", () => {
   assert.equal(buscarClientes(LISTA_BUSCAR, "empresa que no existe").length, 0);
   assert.equal(LISTA_BUSCAR.length, 3);
+});
+
+// ===== acceso con clave y permisos (spec 006) =====
+
+test("hashTexto devuelve SHA-256 hex estable (RF-404)", async () => {
+  // vector conocido del SHA-256 de "1234"
+  assert.equal(
+    await hashTexto("1234"),
+    "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4"
+  );
+  assert.equal(await hashTexto("1234"), await hashTexto("1234"));
+  assert.notEqual(await hashTexto("1234"), await hashTexto("1235"));
+  assert.equal((await hashTexto("")).length, 64);
+});
+
+test("esAdmin solo reconoce al administrador (RF-403)", () => {
+  assert.equal(esAdmin("administrador"), true);
+  assert.equal(esAdmin("usuario"), false);
+  assert.equal(esAdmin(""), false);
+  assert.equal(esAdmin(null), false);
+});
+
+const ARCHIVO_IMPORT = [
+  { id: 7, fecha: 1760000000000, empresa: "Textiles Norte", cif: "B1", contacto: "", telefono: "600", email: "", direccion: "", tipo: "Tela", notas: "" },
+  { empresa: "  ", tipo: "Tela" },            // sin empresa real -> se filtra
+  { empresa: "Asientos Vega", tipo: "FOAM" } // sin id/fecha -> se generan
+];
+
+test("validarImportacion acepta array y objeto con clientes (RF-407)", () => {
+  const a = validarImportacion(ARCHIVO_IMPORT);
+  assert.equal(a.ok, true);
+  assert.equal(a.clientes.length, 2); // el item sin empresa se filtra
+  assert.equal(a.clientes[0].id, 7);  // conserva id y fecha
+  assert.equal(a.clientes[0].fecha, 1760000000000);
+  const b = validarImportacion({ clientes: ARCHIVO_IMPORT });
+  assert.equal(b.ok, true);
+  assert.equal(b.clientes.length, 2);
+});
+
+test("validarImportacion rechaza archivos inválidos sin tocar datos (RF-407)", () => {
+  assert.equal(validarImportacion(null).ok, false);
+  assert.equal(validarImportacion("texto").ok, false);
+  assert.equal(validarImportacion({}).ok, false);
+  assert.equal(validarImportacion([{ nota: "sin empresa" }]).ok, false);
+  assert.equal(validarImportacion([]).ok, false);
+  assert.equal(validarImportacion(ARCHIVO_IMPORT).clientes.length, 2); // no muta la entrada
+});
+
+test("nombreArchivoExportacion usa la fecha local (RF-406)", () => {
+  assert.equal(nombreArchivoExportacion(new Date(2026, 9, 13)), "clientes-2026-10-13.json");
+  assert.equal(nombreArchivoExportacion(new Date(2026, 0, 5)), "clientes-2026-01-05.json");
 });
