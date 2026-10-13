@@ -154,8 +154,10 @@ function iniciarEdicion(id) {
   formulario.cif.value = cliente.cif || "";
   formulario.contacto.value = cliente.contacto || "";
   formulario.telefono.value = cliente.telefono || "";
+  formulario.movil.value = cliente.movil || "";
   formulario.email.value = cliente.email || "";
   formulario.direccion.value = cliente.direccion || "";
+  formulario.codigoPostal.value = cliente.codigoPostal || "";
   formulario.tipo.value = cliente.tipo || "";
   formulario.notas.value = cliente.notas || "";
 
@@ -191,7 +193,7 @@ function guardarEdicion(datos) {
     return;
   }
 
-  // Actualizamos los 8 campos conservando id y fecha originales (ver logica.js)
+  // Actualizamos los 10 campos conservando id y fecha originales (ver logica.js)
   clientes = aplicarEdicion(clientes, clienteEditandoId, datos);
   guardarClientes();
 
@@ -311,7 +313,7 @@ function crearTarjeta(cliente) {
   return (
     '<article class="tarjeta tarjeta-' + claseTipo(cliente.tipo) + (editando ? " editando" : "") + '">' +
       '<div class="tarjeta-cabecera">' +
-        '<h3 class="tarjeta-empresa">' + escapar(cliente.empresa) + "</h3>" +
+        '<h3 class="tarjeta-empresa">' + (escapar(cliente.empresa) || "Sin nombre") + "</h3>" +
         '<span class="etiqueta etiqueta-' + claseTipo(cliente.tipo) + '">' +
           escapar(nombreTipo(cliente.tipo)) +
         "</span>" +
@@ -320,8 +322,10 @@ function crearTarjeta(cliente) {
         fila("CIF/NIF", cliente.cif) +
         fila("Persona de contacto", cliente.contacto) +
         fila("Teléfono", cliente.telefono) +
+        fila("Móvil", cliente.movil) +
         fila("Correo", cliente.email) +
         fila("Dirección", cliente.direccion) +
+        fila("Código postal", cliente.codigoPostal) +
       "</dl>" +
       cuadroMapa(cliente) +
       (cliente.notas ? '<p class="notas">' + escapar(cliente.notas) + "</p>" : "") +
@@ -332,8 +336,9 @@ function crearTarjeta(cliente) {
 
 // Cuadro del mapa de Google Maps (spec 004):
 // iframe con la ubicación; sin conexión se degrada a un enlace.
+// Usa dirección + código postal (spec 007, RF-503).
 function cuadroMapa(cliente) {
-  const direccion = texto(cliente.direccion);
+  const direccion = direccionCompleta(cliente.direccion, cliente.codigoPostal);
 
   let enLinea = true;
   try {
@@ -409,15 +414,29 @@ function mostrarApp() {
   pintarLista();
 }
 
-// Login: compara el hash de lo escrito con los hashes guardados (RF-402)
-formularioAcceso.addEventListener("submit", async function (evento) {
+// Texto por defecto del error de acceso (se restaura en cada intento)
+const ERROR_ACCESO = "Clave incorrecta. Inténtalo de nuevo.";
+
+// Login: compara el hash de lo escrito con los hashes guardados (RF-402).
+// El hash es JS puro y síncrono (spec 007, RF-506) y cualquier fallo inesperado
+// se muestra en pantalla: nunca se queda mudo.
+formularioAcceso.addEventListener("submit", function (evento) {
   evento.preventDefault();
   const valor = claveAcceso.value.trim();
   if (valor === "") return;
 
-  const hashes = hashesVigentes();
-  const hash = await hashTexto(valor);
+  errorAcceso.textContent = ERROR_ACCESO;
 
+  let hash = "";
+  try {
+    hash = hashTexto(valor);
+  } catch (error) {
+    errorAcceso.textContent = "No se pudo comprobar la clave. Actualiza el navegador e inténtalo de nuevo.";
+    errorAcceso.hidden = false;
+    return;
+  }
+
+  const hashes = hashesVigentes();
   let rolEncontrado = null;
   if (hash === hashes.usuario) rolEncontrado = "usuario";
   if (hash === hashes.administrador) rolEncontrado = "administrador";
@@ -512,7 +531,7 @@ botonCancelarImportar.addEventListener("click", function () {
 });
 
 // Cambiar claves: se guardan hasheadas, nunca en claro (RF-404)
-botonGuardarClaves.addEventListener("click", async function () {
+botonGuardarClaves.addEventListener("click", function () {
   const nuevaUsuario = claveNuevaUsuario.value.trim();
   const nuevaAdmin = claveNuevaAdmin.value.trim();
 
@@ -522,8 +541,8 @@ botonGuardarClaves.addEventListener("click", async function () {
   }
 
   localStorage.setItem(CLAVE_ACCESO, JSON.stringify({
-    usuario: await hashTexto(nuevaUsuario),
-    administrador: await hashTexto(nuevaAdmin)
+    usuario: hashTexto(nuevaUsuario),
+    administrador: hashTexto(nuevaAdmin)
   }));
   claveNuevaUsuario.value = "";
   claveNuevaAdmin.value = "";

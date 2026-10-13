@@ -44,8 +44,8 @@
 
       <form id="formulario-cliente">
         <div class="campo">
-          <label for="empresa">Nombre de la empresa *</label>
-          <input type="text" id="empresa" name="empresa" autocomplete="organization" required>
+          <label for="empresa">Nombre de la empresa</label>
+          <input type="text" id="empresa" name="empresa" autocomplete="organization">
         </div>
 
         <div class="campo">
@@ -59,8 +59,13 @@
         </div>
 
         <div class="campo">
-          <label for="telefono">Teléfono de contacto *</label>
-          <input type="tel" id="telefono" name="telefono" autocomplete="tel" required>
+          <label for="telefono">Teléfono de contacto</label>
+          <input type="tel" id="telefono" name="telefono" autocomplete="tel">
+        </div>
+
+        <div class="campo">
+          <label for="movil">Móvil</label>
+          <input type="tel" id="movil" name="movil" autocomplete="off">
         </div>
 
         <div class="campo">
@@ -74,8 +79,13 @@
         </div>
 
         <div class="campo">
-          <label for="tipo">Tipo de cliente *</label>
-          <select id="tipo" name="tipo" autocomplete="off" required>
+          <label for="codigo-postal">Código postal</label>
+          <input type="text" id="codigo-postal" name="codigoPostal" autocomplete="postal-code" inputmode="numeric">
+        </div>
+
+        <div class="campo">
+          <label for="tipo">Tipo de cliente</label>
+          <select id="tipo" name="tipo" autocomplete="off">
             <option value="" selected disabled>Selecciona un tipo</option>
             <option value="Tela">Tela</option>
             <option value="FOAM">Espuma</option>

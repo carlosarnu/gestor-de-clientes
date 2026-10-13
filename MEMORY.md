@@ -15,11 +15,13 @@ Memoria del proyecto entre sesiones. Máximo 50 líneas.
 - **Agentes SDD arreglados (2026-10-13)**: rutas `specs/`→`docs/specs/` en coordinator/planner, permiso de edición del planner a `docs/specs/**`, `reviewer.md` reescrito y AGENTS.md actualizado. `coordinator` = `mode: primary` (idéntico a MSD; se usa como agente principal con el selector, p. ej. `/agent coordinator`). El error «free tier can only be used from within OpenCode» es el **límite de sesiones de la free tier** (mensaje engañoso, se recupera solo): verificado 2026-10-13 — agente por defecto y reviewer OK en este proyecto y coordinator OK en MSD; agotada la ventana, fallan todos los agentes. No es configuración del proyecto.
 - **Proyecto alineado con MyStudyDiary (2026-10-13)**: skills nuevas en `.agents/skills/` (`frontend-design`, `web-design-guidelines`, `local-dates` adaptada a `fecha`) + `skills-lock.json`; eliminado el duplicado obsoleto `.opencode/skills/sdd` (ahora carga el rico de `.agents` con rutas `docs/specs/`); AGENTS.md reescrito con la estructura completa de MSD (stack, datos, features, límites, verificación); reviewer con `git diff`/`git status` + skill de fechas; MCPs iguales (Context7 verificado **sin clave**, sin secretos); `.gitignore` + repo git con commit inicial `bc3b5f2` (40 archivos).
 - **006-accesos IMPLEMENTADA (2026-10-13)**: pantalla de clave con dos perfiles — usuario (2468: añade/edita/busca) y administrador (9753: además borra, exporta/importa JSON y cambia claves). Claves guardadas **solo como hash SHA-256** (WebCrypto; por defecto documentadas, el admin las cambia); sesión en `sessionStorage` (+ «mantener sesión» en `localStorage`) y botón «Salir». Exportar descarga `clientes-AAAA-MM-DD.json` (fecha local) y importar reemplaza tras confirmar con contadores. Protección disuasoria sin servidor (decisión del usuario). En `docs/specs/006-accesos/`. **30 tests en verde**.
+- **007-campos-libres IMPLEMENTADA (2026-10-13)**: nada es obligatorio en el formulario («Sin nombre»/«Sin tipo» en la ficha), campos nuevos **Móvil** y **Código postal** (formulario, ficha, buscador, exportar/importar; el mapa usa dirección + CP). Además el acceso ya **no depende de WebCrypto**: `hashTexto` es SHA-256 en **JS puro** síncrono con los mismos hashes de siempre (paridad con `CLAVES_POR_DEFECTO` testada) y los fallos se muestran en pantalla — el usuario no podía entrar en su navegador y esto lo arregla. Importar: item sin empresa vale si trae otro dato. En `docs/specs/007-campos-libres/`. **35 tests en verde**, verificado en navegador (incl. móvil 375 y consola limpia).
 
 ## Decisiones (y por qué)
 - Arquitectura estática pura (HTML/CSS/JS, sin dependencias) → portabilidad y doble clic (`file://`).
 - Orden de la lista: de más reciente a más antiguo por fecha.
-- Obligatorios solo: empresa, teléfono y tipo.
+- ~~Obligatorios solo: empresa, teléfono y tipo~~ → **nada obligatorio** (spec 007, decisión del padre del usuario): «que rellene lo que él considere».
+- El hash de las claves es JS puro (spec 007): sin WebCrypto, para que el acceso funcione en cualquier navegador.
 - Idioma: identificadores, comentarios, interfaz y documentación en español (constitución regla 5, enmendada 2026-10-13).
 - Tests: lógica pura en `logica.js` con `node --test`; la capa DOM se verifica con Chrome DevTools. Repo git desde 2026-10-13 (`.gitignore` al estilo de MSD, commit inicial `bc3b5f2`).
 
@@ -28,4 +30,4 @@ Memoria del proyecto entre sesiones. Máximo 50 líneas.
 - Archivos de la app: `index.html`, `styles.css`, `logica.js`, `app.js`; tests: `test-logica.js`.
 
 ## Próximos pasos
-- 006 cerrada. Mejoras candidatas: resaltado de coincidencias en el buscador, OpenStreetMap como alternativa sin Google.
+- 007 cerrada. **Pendiente grande**: el padre quiere app de escritorio (no web) — decisión tomada a medias (envolver el código actual vs. reescrita) y aún sin implementar. Mejoras candidatas: resaltado de coincidencias en el buscador, OpenStreetMap como alternativa sin Google.

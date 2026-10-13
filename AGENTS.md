@@ -28,8 +28,9 @@ funcionar sin servidor.
 ## Datos
 
 - `localStorage`, clave única `gestorClientes` (JSON con un array de clientes).
-- Esquema del cliente: `{ id, fecha, empresa*, cif, contacto, telefono*, email,
-  direccion, tipo*, notas }` con `*` = obligatorio en el formulario.
+- Esquema del cliente: `{ id, fecha, empresa, cif, contacto, telefono, movil, email,
+  direccion, codigoPostal, tipo, notas }`. **Ningún campo es obligatorio** (spec 007):
+  lo vacío se muestra como «Sin nombre»/«Sin tipo».
 - `tipo` se guarda como `"Tela" | "FOAM" | "Estructuras"`. La interfaz muestra
   **«Espuma»** para FOAM (función `nombreTipo`), pero **el valor guardado no cambia**:
   no hay migraciones de datos.
@@ -63,10 +64,14 @@ funcionar sin servidor.
 - **Acceso con clave y permisos (spec 006)**: al abrir hay una pantalla de clave con dos
   perfiles — **usuario** (añade, edita, busca y filtra) y **administrador** (además borra,
   exporta, importa y cambia las claves). Las claves se guardan **solo como hash
-  SHA-256** (nunca en claro); la sesión vive en `sessionStorage` (o `localStorage` si se
+  SHA-256 en JS puro** (sin WebCrypto: funciona en cualquier navegador, nunca en claro);
+  la sesión vive en `sessionStorage` (o `localStorage` si se
   marca «mantener sesión iniciada») y «Salir» la cierra. La exportación descarga
   `clientes-AAAA-MM-DD.json` y la importación reemplaza los datos tras confirmar. Es una
   protección **disuasoria** (la app funciona sin servidor, RF-409).
+- **Formulario libre y campos nuevos (spec 007)**: nada es obligatorio; la ficha muestra
+  «Sin nombre»/«Sin tipo» cuando faltan. Campos **Móvil** y **Código postal** en
+  formulario, ficha, buscador e importar/exportar; el mapa usa dirección + código postal.
 
 ## Forma de trabajar (SDD)
 

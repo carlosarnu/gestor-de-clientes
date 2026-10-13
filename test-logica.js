@@ -17,6 +17,7 @@ const {
   ordenarClientes,
   textoContador,
   mensajeAviso,
+  direccionCompleta,
   debeMostrarMapa,
   urlMapa,
   urlBusquedaMapa,
@@ -29,11 +30,6 @@ const {
   validarImportacion,
   nombreArchivoExportacion
 } = require("./logica.js");
-
-// WebCrypto por si el Node de turnos no lo trae global (no afecta al navegador)
-if (typeof globalThis.crypto === "undefined") {
-  globalThis.crypto = require("node:crypto").webcrypto;
-}
 
 // Ayuda: un formulario falso con la interfaz de FormData (.get)
 function formulario(valores) {
@@ -79,28 +75,40 @@ test("claseTipo convierte el tipo a minúsculas para las clases CSS", () => {
 
 // ===== alta (RF-011: formato de datos) =====
 
-test("construirCliente crea los 10 campos con id y fecha dados (RF-011)", () => {
+test("construirCliente crea los 12 campos con id y fecha dados (RF-011, RF-502)", () => {
   const nuevo = construirCliente(
-    formulario({ empresa: "  Muebles Rápido  ", cif: "A1", contacto: "", telefono: " 611 ", email: "", direccion: "", tipo: "FOAM", notas: "nada" }),
+    formulario({ empresa: "  Muebles Rápido  ", cif: "A1", contacto: "", telefono: " 611 ", movil: "622333444", email: "", direccion: "Calle Luna 5", codigoPostal: "28002", tipo: "FOAM", notas: "nada" }),
     555,
     1760000000000
   );
-  assert.deepEqual(Object.keys(nuevo), ["id", "fecha", "empresa", "cif", "contacto", "telefono", "email", "direccion", "tipo", "notas"]);
+  assert.deepEqual(Object.keys(nuevo), ["id", "fecha", "empresa", "cif", "contacto", "telefono", "movil", "email", "direccion", "codigoPostal", "tipo", "notas"]);
   assert.equal(nuevo.id, 555);
   assert.equal(nuevo.fecha, 1760000000000);
   assert.equal(nuevo.empresa, "Muebles Rápido");
   assert.equal(nuevo.telefono, "611");
+  assert.equal(nuevo.movil, "622333444");
+  assert.equal(nuevo.codigoPostal, "28002");
+});
+
+test("construirCliente con todo vacío guarda igual (nada es obligatorio, RF-501)", () => {
+  const vacio = construirCliente(formulario({}), 1, 1760000000000);
+  assert.equal(vacio.empresa, "");
+  assert.equal(vacio.tipo, "");
+  assert.equal(vacio.movil, "");
+  assert.equal(vacio.codigoPostal, "");
 });
 
 // ===== edición (RF-007, RF-011) =====
 
 test("aplicarEdicion conserva id y fecha y no duplica el cliente (RF-007)", () => {
-  const editada = aplicarEdicion(LISTA, 1001, formulario({ empresa: "Textiles Norte S.L.", cif: "B1", contacto: "Ana", telefono: "600", email: "", direccion: "", tipo: "Tela", notas: "" }));
+  const editada = aplicarEdicion(LISTA, 1001, formulario({ empresa: "Textiles Norte S.L.", cif: "B1", contacto: "Ana", telefono: "600", movil: "655777888", email: "", direccion: "", codigoPostal: "28013", tipo: "Tela", notas: "" }));
   assert.equal(editada.length, LISTA.length);
   const editado = buscarCliente(editada, 1001);
   assert.equal(editado.id, 1001);
   assert.equal(editado.fecha, CLIENTE_V1.fecha);
   assert.equal(editado.empresa, "Textiles Norte S.L.");
+  assert.equal(editado.movil, "655777888"); // campo nuevo (spec 007)
+  assert.equal(editado.codigoPostal, "28013");
   // los demás quedan intactos
   assert.deepEqual(buscarCliente(editada, 1002), LISTA[1]);
 });
@@ -169,6 +177,14 @@ test("mensajeAviso devuelve los textos en español del toast (RF-012)", () => {
 
 // ===== mapa de Google Maps (spec 004) =====
 
+test("direccionCompleta une dirección y código postal (RF-503)", () => {
+  assert.equal(direccionCompleta("Calle Sol 1, Madrid", "28001"), "Calle Sol 1, Madrid 28001");
+  assert.equal(direccionCompleta("Calle Sol 1, Madrid", ""), "Calle Sol 1, Madrid");
+  assert.equal(direccionCompleta("", "28001"), "28001");
+  assert.equal(direccionCompleta("  ", "  "), "");
+  assert.equal(direccionCompleta(null, undefined), "");
+});
+
 test("debeMostrarMapa solo con dirección real (RF-201/RF-202)", () => {
   assert.equal(debeMostrarMapa("Calle Mayor 12"), true);
   assert.equal(debeMostrarMapa("  Calle Mayor 12  "), true);
@@ -204,11 +220,12 @@ test("contenidoMapa devuelve enlace sin conexión y nada sin dirección (RF-203/
 
 // ===== buscador de texto y etiquetas (spec 005) =====
 
-test("nombreTipo muestra Espuma en la interfaz y conserva el resto (RF-301)", () => {
+test("nombreTipo muestra Espuma en la interfaz y «Sin tipo» si está vacío (RF-301, RF-504)", () => {
   assert.equal(nombreTipo("FOAM"), "Espuma");
   assert.equal(nombreTipo("Tela"), "Tela");
   assert.equal(nombreTipo("Estructuras"), "Estructuras");
-  assert.equal(nombreTipo(""), "");
+  assert.equal(nombreTipo(""), "Sin tipo");
+  assert.equal(nombreTipo(null), "Sin tipo");
 });
 
 test("normalizar quita mayúsculas, acentos y sobrantes (RF-303)", () => {
@@ -218,9 +235,9 @@ test("normalizar quita mayúsculas, acentos y sobrantes (RF-303)", () => {
 });
 
 const LISTA_BUSCAR = [
-  { id: 1, fecha: 1, empresa: "Textiles Norte", cif: "B12345678", contacto: "Nuria Peña", telefono: "600111222", email: "nuria@norte.es", direccion: "Calle Sol 1, Madrid", tipo: "Tela", notas: "" },
-  { id: 2, fecha: 2, empresa: "Asientos Vega", cif: "", contacto: "Luis", telefono: "633444555", email: "", direccion: "", tipo: "FOAM", notas: "Pide presupuesto en OCTUBRE" },
-  { id: 3, fecha: 3, empresa: "Estructuras Delta", cif: "", contacto: "", telefono: "699888777", email: "", direccion: "Avenida de la Constitución 4, Sevilla", tipo: "Estructuras", notas: "Obra grande" }
+  { id: 1, fecha: 1, empresa: "Textiles Norte", cif: "B12345678", contacto: "Nuria Peña", telefono: "600111222", movil: "611999888", email: "nuria@norte.es", direccion: "Calle Sol 1, Madrid", codigoPostal: "28001", tipo: "Tela", notas: "" },
+  { id: 2, fecha: 2, empresa: "Asientos Vega", cif: "", contacto: "Luis", telefono: "633444555", movil: "", email: "", direccion: "", codigoPostal: "", tipo: "FOAM", notas: "Pide presupuesto en OCTUBRE" },
+  { id: 3, fecha: 3, empresa: "Estructuras Delta", cif: "", contacto: "", telefono: "699888777", movil: "", email: "", direccion: "Avenida de la Constitución 4, Sevilla", codigoPostal: "41001", tipo: "Estructuras", notas: "Obra grande" }
 ];
 
 test("buscarClientes con consulta vacía devuelve toda la lista (RF-302)", () => {
@@ -256,17 +273,28 @@ test("buscarClientes sin coincidencias devuelve vacía y no muta la lista (RF-30
   assert.equal(LISTA_BUSCAR.length, 3);
 });
 
-// ===== acceso con clave y permisos (spec 006) =====
+test("buscarClientes encuentra por móvil y por código postal (RF-502)", () => {
+  assert.deepEqual(buscarClientes(LISTA_BUSCAR, "611999").map(c => c.id), [1]);
+  assert.deepEqual(buscarClientes(LISTA_BUSCAR, "28001").map(c => c.id), [1]);
+  assert.deepEqual(buscarClientes(LISTA_BUSCAR, "41001").map(c => c.id), [3]);
+  assert.equal(buscarClientes(LISTA_BUSCAR, "000555").length, 0); // no existe en ningún sitio
+});
 
-test("hashTexto devuelve SHA-256 hex estable (RF-404)", async () => {
-  // vector conocido del SHA-256 de "1234"
-  assert.equal(
-    await hashTexto("1234"),
-    "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4"
-  );
-  assert.equal(await hashTexto("1234"), await hashTexto("1234"));
-  assert.notEqual(await hashTexto("1234"), await hashTexto("1235"));
-  assert.equal((await hashTexto("")).length, 64);
+// ===== acceso con clave y permisos (spec 006) + hash puro (spec 007) =====
+
+test("hashTexto es SHA-256 en JS puro con los vectores conocidos (RF-506)", () => {
+  // vectores verificados contra node:crypto: mismo resultado que antes con WebCrypto
+  assert.equal(hashTexto(""), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+  assert.equal(hashTexto("1234"), "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4");
+  assert.equal(hashTexto("Pérdón ñ ñáéíóú"), "40cc1ce096dc5811ad5d0cf6cfdf8f4c19ac970114cb06ea0e49cc0867d6bfef");
+});
+
+test("hashTexto coincide con CLAVES_POR_DEFECTO de app.js (paridad RF-404/RF-506)", () => {
+  assert.equal(hashTexto("2468"), "a1fb4e703a9ef1fa4936801721ff285a97ac85330856674412e054892afe6972");
+  assert.equal(hashTexto("9753"), "e4ed4d14170e2017c139c958853c66f4cecd6b43c12b0e0c641f4288bd859d93");
+  assert.equal(hashTexto("1234"), hashTexto("1234"));
+  assert.notEqual(hashTexto("1234"), hashTexto("1235"));
+  assert.equal(hashTexto(null), hashTexto("")); // no revienta con vacíos
 });
 
 test("esAdmin solo reconoce al administrador (RF-403)", () => {
@@ -277,29 +305,45 @@ test("esAdmin solo reconoce al administrador (RF-403)", () => {
 });
 
 const ARCHIVO_IMPORT = [
-  { id: 7, fecha: 1760000000000, empresa: "Textiles Norte", cif: "B1", contacto: "", telefono: "600", email: "", direccion: "", tipo: "Tela", notas: "" },
-  { empresa: "  ", tipo: "Tela" },            // sin empresa real -> se filtra
-  { empresa: "Asientos Vega", tipo: "FOAM" } // sin id/fecha -> se generan
+  { id: 7, fecha: 1760000000000, empresa: "Textiles Norte", cif: "B1", contacto: "", telefono: "600", movil: "611222333", email: "", direccion: "", codigoPostal: "28001", tipo: "Tela", notas: "" },
+  { empresa: "  ", tipo: "Tela" },                    // sin empresa: válido (RF-501)
+  { movil: "655444333", codigoPostal: "41002" },      // sin empresa: válido (RF-502)
+  { empresa: "Asientos Vega", tipo: "FOAM" },         // sin id/fecha -> se generan
+  { comentario: "esto no es un cliente" }             // ningún campo propio -> se filtra
 ];
 
-test("validarImportacion acepta array y objeto con clientes (RF-407)", () => {
+test("validarImportacion acepta array y objeto con clientes (RF-407, RF-501)", () => {
   const a = validarImportacion(ARCHIVO_IMPORT);
   assert.equal(a.ok, true);
-  assert.equal(a.clientes.length, 2); // el item sin empresa se filtra
+  assert.equal(a.clientes.length, 4); // solo se filtra el item sin ningún dato propio
   assert.equal(a.clientes[0].id, 7);  // conserva id y fecha
   assert.equal(a.clientes[0].fecha, 1760000000000);
+  assert.equal(a.clientes[0].movil, "611222333");
+  assert.equal(a.clientes[0].codigoPostal, "28001");
+  assert.equal(a.clientes[1].empresa, ""); // empresa vacía permitida
+  assert.equal(a.clientes[2].movil, "655444333");
   const b = validarImportacion({ clientes: ARCHIVO_IMPORT });
   assert.equal(b.ok, true);
-  assert.equal(b.clientes.length, 2);
+  assert.equal(b.clientes.length, 4);
 });
 
 test("validarImportacion rechaza archivos inválidos sin tocar datos (RF-407)", () => {
   assert.equal(validarImportacion(null).ok, false);
   assert.equal(validarImportacion("texto").ok, false);
   assert.equal(validarImportacion({}).ok, false);
-  assert.equal(validarImportacion([{ nota: "sin empresa" }]).ok, false);
+  assert.equal(validarImportacion([{ comentario: "no es cliente" }]).ok, false);
+  assert.equal(validarImportacion([{ empresa: "  ", cif: null }]).ok, false);
   assert.equal(validarImportacion([]).ok, false);
-  assert.equal(validarImportacion(ARCHIVO_IMPORT).clientes.length, 2); // no muta la entrada
+  assert.equal(validarImportacion(ARCHIVO_IMPORT).clientes.length, 4); // no muta la entrada
+});
+
+test("validarImportacion normaliza los campos de archivo antiguo (RF-507)", () => {
+  // archivo anterior a la spec 007: sin movil ni codigoPostal
+  const viejo = [{ id: 3, fecha: 1760000000000, empresa: "Clínica Sur", cif: "", contacto: "", telefono: "912345678", email: "", direccion: "", tipo: "Tela", notas: "" }];
+  const r = validarImportacion(viejo);
+  assert.equal(r.ok, true);
+  assert.equal(r.clientes[0].movil, "");
+  assert.equal(r.clientes[0].codigoPostal, "");
 });
 
 test("nombreArchivoExportacion usa la fecha local (RF-406)", () => {
