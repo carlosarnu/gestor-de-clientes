@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestor de Clientes</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <header class="cabecera">
+    <div class="contenedor">
+      <h1>Gestor de Clientes</h1>
+      <p>Clientes de tela, espuma y estructuras</p>
+    </div>
+  </header>
+
+  <main class="contenedor">
+
+    <!-- Formulario para registrar un cliente -->
+    <section class="panel" id="panel-formulario">
+      <h2 id="titulo-formulario">Nuevo cliente</h2>
+
+      <form id="formulario-cliente">
+        <div class="campo">
+          <label for="empresa">Nombre de la empresa *</label>
+          <input type="text" id="empresa" name="empresa" autocomplete="organization" required>
+        </div>
+
+        <div class="campo">
+          <label for="cif">CIF/NIF</label>
+          <input type="text" id="cif" name="cif" autocomplete="off">
+        </div>
+
+        <div class="campo">
+          <label for="contacto">Persona de contacto</label>
+          <input type="text" id="contacto" name="contacto" autocomplete="name">
+        </div>
+
+        <div class="campo">
+          <label for="telefono">Teléfono de contacto *</label>
+          <input type="tel" id="telefono" name="telefono" autocomplete="tel" required>
+        </div>
+
+        <div class="campo">
+          <label for="email">Correo electrónico</label>
+          <input type="email" id="email" name="email" autocomplete="email">
+        </div>
+
+        <div class="campo">
+          <label for="direccion">Dirección física</label>
+          <input type="text" id="direccion" name="direccion" autocomplete="street-address">
+        </div>
+
+        <div class="campo">
+          <label for="tipo">Tipo de cliente *</label>
+          <select id="tipo" name="tipo" autocomplete="off" required>
+            <option value="" selected disabled>Selecciona un tipo</option>
+            <option value="Tela">Tela</option>
+            <option value="FOAM">Espuma</option>
+            <option value="Estructuras">Estructuras</option>
+          </select>
+        </div>
+
+        <div class="campo campo-completo">
+          <label for="notas">Información adicional / Notas</label>
+          <textarea id="notas" name="notas" autocomplete="off" rows="4"></textarea>
+        </div>
+
+        <div class="campo campo-completo">
+          <div class="acciones-formulario">
+            <button type="submit" class="boton-principal" id="boton-guardar">Guardar cliente</button>
+            <button type="button" class="boton-secundario" id="boton-cancelar" hidden>Cancelar</button>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <!-- Lista de clientes -->
+    <section class="panel">
+      <div class="lista-cabecera">
+        <h2>Clientes</h2>
+        <p class="contador" id="contador"></p>
+      </div>
+
+      <!-- Buscador por texto (spec 005) -->
+      <div class="buscador">
+        <label for="buscador">Buscar cliente</label>
+        <input type="search" id="buscador" autocomplete="off"
+               placeholder="Escribe palabras: empresa, contacto, CIF…">
+      </div>
+
+      <div class="filtros" id="filtros">
+        <button type="button" class="filtro activo" data-filtro="Todos">Todos</button>
+        <button type="button" class="filtro" data-filtro="Tela">Tela</button>
+        <button type="button" class="filtro" data-filtro="FOAM">Espuma</button>
+        <button type="button" class="filtro" data-filtro="Estructuras">Estructuras</button>
+      </div>
+
+      <div class="lista-clientes" id="lista-clientes"></div>
+    </section>
+
+  </main>
+
+  <!-- Aviso breve tipo toast (Cliente actualizado / Cliente eliminado) -->
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="logica.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
