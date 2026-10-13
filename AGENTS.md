@@ -62,9 +62,13 @@ funcionar sin servidor.
 - No escribas código a lo ciego: sigue Spec-Driven Development (skill `sdd`) —
   constitución → especificación (`spec.md`) → plan (`plan.md`) → tareas (`tasks.md`) →
   implementación. Las specs viven en `docs/specs/NNN-nombre/`.
-- Usa el agente coordinador (`@coordinator`) para orquestar el flujo completo y los
-  subagentes (`@planner`, `@reviewer`, `@implementer`) según corresponda. Para cambios
-  pequeños que no merecen spec, usa `/feature`.
+- Para el flujo SDD completo, selecciona `coordinator` como **agente principal** (selector
+  de agentes del TUI, p. ej. `/agent coordinator`) — él orquesta a los subagentes
+  `@planner`, `@reviewer` e `@implementer`. Para cambios pequeños que no merecen spec,
+  usa `/feature`.
+- NOTA free tier: si un agente nuevo falla con «free tier can only be used from within
+  OpenCode», es el límite de sesiones de la free tier (mensaje engañoso); se recupera
+  solo al pasar la ventana y no es configuración del proyecto.
 
 ## Memoria
 
