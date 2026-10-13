@@ -8,31 +8,10 @@
 </head>
 <body>
 
-  <!-- Pantalla de acceso con clave (spec 006) -->
-  <div class="acceso" id="pantalla-acceso">
-    <form class="acceso-tarjeta" id="formulario-acceso">
-      <h1>Acceso</h1>
-      <label for="clave-acceso">Tu clave</label>
-      <input type="password" id="clave-acceso" inputmode="numeric" autocomplete="current-password" required>
-      <p class="acceso-error" id="error-acceso" hidden>Clave incorrecta. Inténtalo de nuevo.</p>
-      <label class="acceso-recordar" for="recordar-sesion">
-        <input type="checkbox" id="recordar-sesion"> Mantener sesión iniciada
-      </label>
-      <button type="submit" class="boton-principal">Entrar</button>
-      <p class="acceso-nota">¿Sin clave? Pide al administrador.<br>
-        Aviso: la clave es disuasoria (la app funciona sin servidor).</p>
-    </form>
-  </div>
-
-  <div id="contenido-app" hidden>
-
   <header class="cabecera">
-    <div class="contenedor cabecera-contenido">
-      <div>
-        <h1>Gestor de Clientes</h1>
-        <p>Clientes de tela, espuma y estructuras</p>
-      </div>
-      <button type="button" class="boton-salir" id="boton-salir">Salir</button>
+    <div class="contenedor">
+      <h1>Gestor de Clientes</h1>
+      <p>Clientes de tela, espuma y estructuras</p>
     </div>
   </header>
 
@@ -131,42 +110,7 @@
       <div class="lista-clientes" id="lista-clientes"></div>
     </section>
 
-    <!-- Herramientas del administrador (spec 006, solo visible con su clave) -->
-    <section class="panel panel-admin" id="panel-admin" hidden>
-      <h2>Herramientas del administrador</h2>
-
-      <div class="admin-fila">
-        <button type="button" class="boton-secundario" id="boton-exportar">Exportar clientes (JSON)</button>
-        <button type="button" class="boton-secundario" id="boton-importar">Importar clientes (JSON)</button>
-        <input type="file" id="archivo-importar" accept=".json,application/json" hidden>
-      </div>
-
-      <!-- Confirmación de la importación (sin confirm() nativo) -->
-      <div class="confirmar-importacion" id="confirmar-importacion" hidden>
-        <p id="texto-confirmacion"></p>
-        <div class="admin-fila">
-          <button type="button" class="boton-peligro" id="boton-si-reemplazar">Sí, reemplazar</button>
-          <button type="button" class="boton-secundario" id="boton-cancelar-importar">Cancelar</button>
-        </div>
-      </div>
-
-      <h3>Cambiar claves</h3>
-      <div class="admin-fila">
-        <div class="campo">
-          <label for="clave-nueva-usuario">Nueva clave de usuario</label>
-          <input type="password" id="clave-nueva-usuario" inputmode="numeric" autocomplete="new-password">
-        </div>
-        <div class="campo">
-          <label for="clave-nueva-admin">Nueva clave de administrador</label>
-          <input type="password" id="clave-nueva-admin" inputmode="numeric" autocomplete="new-password">
-        </div>
-      </div>
-      <button type="button" class="boton-secundario" id="boton-guardar-claves">Guardar claves</button>
-    </section>
-
   </main>
-
-  </div><!-- /#contenido-app -->
 
   <!-- Aviso breve tipo toast (Cliente actualizado / Cliente eliminado) -->
   <div class="toast" id="toast" role="status" aria-live="polite"></div>

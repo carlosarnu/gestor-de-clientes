@@ -24,11 +24,7 @@ const {
   contenidoMapa,
   nombreTipo,
   normalizar,
-  buscarClientes,
-  hashTexto,
-  esAdmin,
-  validarImportacion,
-  nombreArchivoExportacion
+  buscarClientes
 } = require("./logica.js");
 
 // Ayuda: un formulario falso con la interfaz de FormData (.get)
@@ -278,75 +274,4 @@ test("buscarClientes encuentra por móvil y por código postal (RF-502)", () => 
   assert.deepEqual(buscarClientes(LISTA_BUSCAR, "28001").map(c => c.id), [1]);
   assert.deepEqual(buscarClientes(LISTA_BUSCAR, "41001").map(c => c.id), [3]);
   assert.equal(buscarClientes(LISTA_BUSCAR, "000555").length, 0); // no existe en ningún sitio
-});
-
-// ===== acceso con clave y permisos (spec 006) + hash puro (spec 007) =====
-
-test("hashTexto es SHA-256 en JS puro con los vectores conocidos (RF-506)", () => {
-  // vectores verificados contra node:crypto: mismo resultado que antes con WebCrypto
-  assert.equal(hashTexto(""), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
-  assert.equal(hashTexto("1234"), "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4");
-  assert.equal(hashTexto("Pérdón ñ ñáéíóú"), "40cc1ce096dc5811ad5d0cf6cfdf8f4c19ac970114cb06ea0e49cc0867d6bfef");
-});
-
-test("hashTexto coincide con CLAVES_POR_DEFECTO de app.js (paridad RF-404/RF-506)", () => {
-  assert.equal(hashTexto("2468"), "a1fb4e703a9ef1fa4936801721ff285a97ac85330856674412e054892afe6972");
-  assert.equal(hashTexto("9753"), "e4ed4d14170e2017c139c958853c66f4cecd6b43c12b0e0c641f4288bd859d93");
-  assert.equal(hashTexto("1234"), hashTexto("1234"));
-  assert.notEqual(hashTexto("1234"), hashTexto("1235"));
-  assert.equal(hashTexto(null), hashTexto("")); // no revienta con vacíos
-});
-
-test("esAdmin solo reconoce al administrador (RF-403)", () => {
-  assert.equal(esAdmin("administrador"), true);
-  assert.equal(esAdmin("usuario"), false);
-  assert.equal(esAdmin(""), false);
-  assert.equal(esAdmin(null), false);
-});
-
-const ARCHIVO_IMPORT = [
-  { id: 7, fecha: 1760000000000, empresa: "Textiles Norte", cif: "B1", contacto: "", telefono: "600", movil: "611222333", email: "", direccion: "", codigoPostal: "28001", tipo: "Tela", notas: "" },
-  { empresa: "  ", tipo: "Tela" },                    // sin empresa: válido (RF-501)
-  { movil: "655444333", codigoPostal: "41002" },      // sin empresa: válido (RF-502)
-  { empresa: "Asientos Vega", tipo: "FOAM" },         // sin id/fecha -> se generan
-  { comentario: "esto no es un cliente" }             // ningún campo propio -> se filtra
-];
-
-test("validarImportacion acepta array y objeto con clientes (RF-407, RF-501)", () => {
-  const a = validarImportacion(ARCHIVO_IMPORT);
-  assert.equal(a.ok, true);
-  assert.equal(a.clientes.length, 4); // solo se filtra el item sin ningún dato propio
-  assert.equal(a.clientes[0].id, 7);  // conserva id y fecha
-  assert.equal(a.clientes[0].fecha, 1760000000000);
-  assert.equal(a.clientes[0].movil, "611222333");
-  assert.equal(a.clientes[0].codigoPostal, "28001");
-  assert.equal(a.clientes[1].empresa, ""); // empresa vacía permitida
-  assert.equal(a.clientes[2].movil, "655444333");
-  const b = validarImportacion({ clientes: ARCHIVO_IMPORT });
-  assert.equal(b.ok, true);
-  assert.equal(b.clientes.length, 4);
-});
-
-test("validarImportacion rechaza archivos inválidos sin tocar datos (RF-407)", () => {
-  assert.equal(validarImportacion(null).ok, false);
-  assert.equal(validarImportacion("texto").ok, false);
-  assert.equal(validarImportacion({}).ok, false);
-  assert.equal(validarImportacion([{ comentario: "no es cliente" }]).ok, false);
-  assert.equal(validarImportacion([{ empresa: "  ", cif: null }]).ok, false);
-  assert.equal(validarImportacion([]).ok, false);
-  assert.equal(validarImportacion(ARCHIVO_IMPORT).clientes.length, 4); // no muta la entrada
-});
-
-test("validarImportacion normaliza los campos de archivo antiguo (RF-507)", () => {
-  // archivo anterior a la spec 007: sin movil ni codigoPostal
-  const viejo = [{ id: 3, fecha: 1760000000000, empresa: "Clínica Sur", cif: "", contacto: "", telefono: "912345678", email: "", direccion: "", tipo: "Tela", notas: "" }];
-  const r = validarImportacion(viejo);
-  assert.equal(r.ok, true);
-  assert.equal(r.clientes[0].movil, "");
-  assert.equal(r.clientes[0].codigoPostal, "");
-});
-
-test("nombreArchivoExportacion usa la fecha local (RF-406)", () => {
-  assert.equal(nombreArchivoExportacion(new Date(2026, 9, 13)), "clientes-2026-10-13.json");
-  assert.equal(nombreArchivoExportacion(new Date(2026, 0, 5)), "clientes-2026-01-05.json");
 });

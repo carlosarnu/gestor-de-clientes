@@ -17,44 +17,10 @@ const panelFormulario = document.getElementById("panel-formulario");
 const aviso = document.getElementById("toast");
 const campoBuscador = document.getElementById("buscador");
 
-// Acceso con clave (spec 006)
-const pantallaAcceso = document.getElementById("pantalla-acceso");
-const formularioAcceso = document.getElementById("formulario-acceso");
-const claveAcceso = document.getElementById("clave-acceso");
-const errorAcceso = document.getElementById("error-acceso");
-const recordarSesion = document.getElementById("recordar-sesion");
-const contenidoApp = document.getElementById("contenido-app");
-const botonSalir = document.getElementById("boton-salir");
-const panelAdmin = document.getElementById("panel-admin");
-const botonExportar = document.getElementById("boton-exportar");
-const botonImportar = document.getElementById("boton-importar");
-const archivoImportar = document.getElementById("archivo-importar");
-const confirmarImportacion = document.getElementById("confirmar-importacion");
-const textoConfirmacion = document.getElementById("texto-confirmacion");
-const botonSiReemplazar = document.getElementById("boton-si-reemplazar");
-const botonCancelarImportar = document.getElementById("boton-cancelar-importar");
-const claveNuevaUsuario = document.getElementById("clave-nueva-usuario");
-const claveNuevaAdmin = document.getElementById("clave-nueva-admin");
-const botonGuardarClaves = document.getElementById("boton-guardar-claves");
-
-// Almacenamiento del acceso (spec 006)
-const CLAVE_ACCESO = "gestorAcceso";                        // localStorage: hashes { usuario, administrador }
-const CLAVE_SESION = "gestorSesion";                        // sessionStorage: rol
-const CLAVE_SESION_PERSISTENTE = "gestorSesionPersistente"; // localStorage: rol
-
-// Hashes SHA-256 de las claves por defecto ("2468" usuario, "9753" administrador):
-// en el código NUNCA aparece el PIN en claro (RF-404)
-const CLAVES_POR_DEFECTO = {
-  usuario: "a1fb4e703a9ef1fa4936801721ff285a97ac85330856674412e054892afe6972",
-  administrador: "e4ed4d14170e2017c139c958853c66f4cecd6b43c12b0e0c641f4288bd859d93"
-};
-
 // Estado de la aplicación
 let clientes = cargarClientes();
 let filtroActivo = "Todos";
 let textoBusqueda = ""; // texto del buscador (spec 005)
-let rol = null; // "usuario" | "administrador" | null (sin sesión)
-let archivoPendiente = null; // clientes validados esperando confirmación de importación
 let clienteEditandoId = null; // id del cliente en edición, o null si no se está editando
 let confirmandoEliminarId = null; // id de la tarjeta mostrando "¿Seguro?", o null si no hay ninguna
 let temporizadorAviso = null;
@@ -296,8 +262,7 @@ function crearTarjeta(cliente) {
   const editando = cliente.id === clienteEditandoId;
   const confirmando = cliente.id === confirmandoEliminarId;
 
-  // Pie de la tarjeta: botones normales o paso de confirmación (nunca a la vez).
-  // «Eliminar» solo lo pinta el administrador (RF-403)
+  // Pie de la tarjeta: botones normales o paso de confirmación (nunca a la vez)
   const pie = confirmando
     ? '<div class="confirmacion">¿Seguro?' +
         '<button type="button" class="boton-tarjeta boton-si" data-accion="confirmar-si" data-id="' + cliente.id + '">Sí, eliminar</button>' +
@@ -305,9 +270,7 @@ function crearTarjeta(cliente) {
       "</div>"
     : '<div class="tarjeta-acciones">' +
         '<button type="button" class="boton-tarjeta boton-editar" data-accion="editar" data-id="' + cliente.id + '">Editar</button>' +
-        (esAdmin(rol)
-          ? '<button type="button" class="boton-tarjeta boton-eliminar" data-accion="eliminar" data-id="' + cliente.id + '">Eliminar</button>'
-          : "") +
+        '<button type="button" class="boton-tarjeta boton-eliminar" data-accion="eliminar" data-id="' + cliente.id + '">Eliminar</button>' +
       "</div>";
 
   return (
@@ -384,188 +347,17 @@ function escapar(valor) {
 }
 
 // =====================================================
-// Acceso con clave y permisos (spec 006)
-// =====================================================
-
-// Claves vigentes: las que haya guardado el administrador, o las por defecto
-function hashesVigentes() {
-  try {
-    const propios = JSON.parse(localStorage.getItem(CLAVE_ACCESO) || "null");
-    if (propios && propios.usuario && propios.administrador) return propios;
-  } catch (error) {
-    // dato corrupto -> claves por defecto
-  }
-  return CLAVES_POR_DEFECTO;
-}
-
-function mostrarPantallaAcceso() {
-  rol = null;
-  contenidoApp.hidden = true;
-  pantallaAcceso.hidden = false;
-  errorAcceso.hidden = true;
-  claveAcceso.value = "";
-}
-
-function mostrarApp() {
-  pantallaAcceso.hidden = true;
-  contenidoApp.hidden = false;
-  panelAdmin.hidden = !esAdmin(rol); // RF-403: herramientas solo del admin
-  pintarFiltros();
-  pintarLista();
-}
-
-// Texto por defecto del error de acceso (se restaura en cada intento)
-const ERROR_ACCESO = "Clave incorrecta. Inténtalo de nuevo.";
-
-// Login: compara el hash de lo escrito con los hashes guardados (RF-402).
-// El hash es JS puro y síncrono (spec 007, RF-506) y cualquier fallo inesperado
-// se muestra en pantalla: nunca se queda mudo.
-formularioAcceso.addEventListener("submit", function (evento) {
-  evento.preventDefault();
-  const valor = claveAcceso.value.trim();
-  if (valor === "") return;
-
-  errorAcceso.textContent = ERROR_ACCESO;
-
-  let hash = "";
-  try {
-    hash = hashTexto(valor);
-  } catch (error) {
-    errorAcceso.textContent = "No se pudo comprobar la clave. Actualiza el navegador e inténtalo de nuevo.";
-    errorAcceso.hidden = false;
-    return;
-  }
-
-  const hashes = hashesVigentes();
-  let rolEncontrado = null;
-  if (hash === hashes.usuario) rolEncontrado = "usuario";
-  if (hash === hashes.administrador) rolEncontrado = "administrador";
-
-  if (rolEncontrado === null) {
-    errorAcceso.hidden = false;
-    claveAcceso.value = "";
-    claveAcceso.focus();
-    return;
-  }
-
-  rol = rolEncontrado;
-  sessionStorage.setItem(CLAVE_SESION, rol);
-  if (recordarSesion.checked) {
-    localStorage.setItem(CLAVE_SESION_PERSISTENTE, rol);
-  } else {
-    localStorage.removeItem(CLAVE_SESION_PERSISTENTE);
-  }
-  mostrarApp();
-});
-
-// Salir: borra la sesión y vuelve a pedir clave (RF-405)
-botonSalir.addEventListener("click", function () {
-  sessionStorage.removeItem(CLAVE_SESION);
-  localStorage.removeItem(CLAVE_SESION_PERSISTENTE);
-  mostrarPantallaAcceso();
-});
-
-// =====================================================
-// Herramientas del administrador (spec 006)
-// =====================================================
-
-// Exportar: descarga un JSON con todos los clientes (RF-406)
-botonExportar.addEventListener("click", function () {
-  const contenido = JSON.stringify(clientes, null, 2);
-  const blob = new Blob([contenido], { type: "application/json" });
-  const enlace = document.createElement("a");
-  enlace.href = URL.createObjectURL(blob);
-  enlace.download = nombreArchivoExportacion(new Date());
-  enlace.click();
-  URL.revokeObjectURL(enlace.href);
-  pintarAviso("Clientes exportados");
-});
-
-// Importar: valida el archivo y pide confirmación antes de reemplazar (RF-407)
-botonImportar.addEventListener("click", function () {
-  archivoImportar.click();
-});
-
-archivoImportar.addEventListener("change", function () {
-  const archivo = archivoImportar.files[0];
-  archivoImportar.value = "";
-  if (!archivo) return;
-
-  const lector = new FileReader();
-  lector.onload = function () {
-    let datos = null;
-    try {
-      datos = JSON.parse(lector.result);
-    } catch (error) {
-      datos = null;
-    }
-
-    const resultado = validarImportacion(datos);
-    if (!resultado.ok) {
-      pintarAviso("Archivo no válido: " + resultado.error);
-      return;
-    }
-
-    archivoPendiente = resultado.clientes;
-    textoConfirmacion.textContent =
-      "Se reemplazarán los " + clientes.length + " clientes actuales por los " +
-      archivoPendiente.length + " del archivo.";
-    confirmarImportacion.hidden = false;
-  };
-  lector.readAsText(archivo);
-});
-
-botonSiReemplazar.addEventListener("click", function () {
-  if (!archivoPendiente) return;
-  clientes = archivoPendiente;
-  archivoPendiente = null;
-  confirmarImportacion.hidden = true;
-  guardarClientes();
-  pintarLista();
-  pintarAviso("Clientes importados");
-});
-
-botonCancelarImportar.addEventListener("click", function () {
-  archivoPendiente = null;
-  confirmarImportacion.hidden = true;
-});
-
-// Cambiar claves: se guardan hasheadas, nunca en claro (RF-404)
-botonGuardarClaves.addEventListener("click", function () {
-  const nuevaUsuario = claveNuevaUsuario.value.trim();
-  const nuevaAdmin = claveNuevaAdmin.value.trim();
-
-  if (nuevaUsuario === "" || nuevaAdmin === "") {
-    pintarAviso("Escribe las dos claves nuevas");
-    return;
-  }
-
-  localStorage.setItem(CLAVE_ACCESO, JSON.stringify({
-    usuario: hashTexto(nuevaUsuario),
-    administrador: hashTexto(nuevaAdmin)
-  }));
-  claveNuevaUsuario.value = "";
-  claveNuevaAdmin.value = "";
-  pintarAviso("Claves actualizadas");
-});
-
-// =====================================================
 // Primer pintado al abrir la página
 // =====================================================
+
+// Limpieza de los restos del acceso retirado (spec 006 retirada el 2026-10-13)
+localStorage.removeItem("gestorAcceso");
+localStorage.removeItem("gestorSesionPersistente");
+sessionStorage.removeItem("gestorSesion");
 
 // Spec 004: si vuelve o se corta la conexión, refrescamos los cuadros de mapa
 window.addEventListener("online", pintarLista);
 window.addEventListener("offline", pintarLista);
 
-// Spec 006: sin sesión iniciada solo se ve la pantalla de acceso (RF-401)
-(function arrancar() {
-  const guardada =
-    localStorage.getItem(CLAVE_SESION_PERSISTENTE) ||
-    sessionStorage.getItem(CLAVE_SESION);
-  if (guardada === "usuario" || guardada === "administrador") {
-    rol = guardada;
-    mostrarApp();
-  } else {
-    mostrarPantallaAcceso();
-  }
-})();
+pintarFiltros();
+pintarLista();

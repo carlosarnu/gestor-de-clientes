@@ -4,7 +4,7 @@
 |---|---|
 | **ID** | `006-accesos` |
 | **Título** | Pantalla de acceso con dos perfiles: usuario (comercial) y administrador |
-| **Estado** | **Aprobada** (decisiones del usuario tomadas el 2026-10-13) |
+| **Estado** | **Retirada** (2026-10-13: el usuario no conseguía entrar y quiere ver la web antes de convertirla en app de escritorio; la funcionalidad se eliminó por completo) |
 | **Fecha** | 2026-10-13 |
 
 ---
