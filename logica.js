@@ -113,8 +113,9 @@ function textoContador(total) {
   return total === 1 ? "1 cliente" : total + " clientes";
 }
 
-// Mensaje del aviso breve (toast)
+// Mensaje del aviso breve (toast); "guardado" es el alta (spec 010, RF-801)
 function mensajeAviso(operacion) {
+  if (operacion === "guardado") return "Cliente guardado";
   return operacion === "eliminado" ? "Cliente eliminado" : "Cliente actualizado";
 }
 

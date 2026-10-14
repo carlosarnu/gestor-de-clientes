@@ -49,7 +49,7 @@ funcionar sin servidor.
   valor interno (`"Espuma"` para la pestaña Espuma). El desplegable funciona igual.
 - **Buscador por texto (spec 005)**: campo «Buscar cliente» que filtra en vivo mientras
   se escribe, con todas las palabras («y») repartidas entre los campos, ignorando
-  acentos y mayúsculas. Se combina con el filtro de tipo y sobreviene a cambios de
+  acentos y mayúsculas. Se combina con el filtro de tipo y sobrevive a cambios de
   filtro y ediciones. Estado vacío contextual: «No hay coincidencias para «X»…».
 - **Mapa (spec 004)**: si `direccion` no está vacía, la tarjeta muestra un cuadro de
   Google Maps (iframe embed sin API key) y el enlace «Ver en Google Maps»; sin

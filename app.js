@@ -30,19 +30,28 @@ let temporizadorAviso = null;
 // =====================================================
 
 function cargarClientes() {
+  // 1) Lectura y parseo: si fallan, empezamos de cero (RF-802)
+  let lista;
   try {
     const datos = localStorage.getItem(CLAVE_STORAGE);
-    const lista = datos ? JSON.parse(datos) : [];
-    // Migración spec 009: el tipo antiguo «FOAM» pasa a «Espuma» (solo si hay cambio)
-    const migrada = migrarTipos(Array.isArray(lista) ? lista : []);
-    if (migrada !== lista) {
-      localStorage.setItem(CLAVE_STORAGE, JSON.stringify(migrada));
-    }
-    return migrada;
+    lista = datos ? JSON.parse(datos) : [];
   } catch (error) {
     // Si los datos están corruptos, empezamos de cero
     return [];
   }
+
+  // Migración spec 009: el tipo antiguo «FOAM» pasa a «Espuma» (solo si hay cambio)
+  const migrada = migrarTipos(Array.isArray(lista) ? lista : []);
+  if (migrada !== lista) {
+    // 2) Escritura de la migración en su propio try: si falla (p. ej. cuota llena)
+    // seguimos con los datos leídos en memoria; un fallo de escritura NUNCA vacía la lista (RF-802)
+    try {
+      localStorage.setItem(CLAVE_STORAGE, JSON.stringify(migrada));
+    } catch (error) {
+      // No se escribe nada; la lista en memoria sigue siendo la correcta
+    }
+  }
+  return migrada;
 }
 
 function guardarClientes() {
@@ -109,6 +118,12 @@ formulario.addEventListener("submit", function (evento) {
 
   clientes.push(construirCliente(datos, Date.now(), Date.now()));
   guardarClientes();
+
+  // Alta con feedback (spec 010, RF-801): buscador limpio y aviso «Cliente guardado».
+  // La limpieza va antes de pintarFiltros/pintarLista para que la lista se pinte sin filtro de texto
+  textoBusqueda = "";
+  campoBuscador.value = "";
+  pintarAviso(mensajeAviso("guardado"));
 
   // Limpiamos el formulario y volvemos a la pestaña "Todos"
   resetearFormulario();

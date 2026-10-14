@@ -210,6 +210,12 @@ test("mensajeAviso devuelve los textos en español del toast (RF-012)", () => {
   assert.equal(mensajeAviso("eliminado"), "Cliente eliminado");
 });
 
+test('mensajeAviso("guardado") avisa del alta con «Cliente guardado» (RF-801)', () => {
+  assert.equal(mensajeAviso("guardado"), "Cliente guardado");
+  assert.equal(mensajeAviso("actualizado"), "Cliente actualizado"); // el resto no cambia
+  assert.equal(mensajeAviso("eliminado"), "Cliente eliminado");
+});
+
 // ===== mapa de Google Maps (spec 004) =====
 
 test("direccionCompleta une dirección y código postal (RF-503)", () => {
