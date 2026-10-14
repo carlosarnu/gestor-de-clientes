@@ -1,6 +1,6 @@
 # Plan — Spec 011 · App de escritorio (Electron)
 
-**Estado:** pendiente de aprobación del usuario
+**Estado:** aprobado por el usuario (2026-10-14) e implementado
 
 ---
 
