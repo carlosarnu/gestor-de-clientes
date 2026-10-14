@@ -31,9 +31,10 @@ funcionar sin servidor.
 - Esquema del cliente: `{ id, fecha, empresa, cif, contacto, telefono, movil, email,
   direccion, codigoPostal, tipo, notas }`. **Ningún campo es obligatorio** (spec 007):
   lo vacío se muestra como «Sin nombre»/«Sin tipo».
-- `tipo` se guarda como `"Tela" | "FOAM" | "Estructuras"`. La interfaz muestra
-  **«Espuma»** para FOAM (función `nombreTipo`), pero **el valor guardado no cambia**:
-  no hay migraciones de datos.
+- `tipo` se guarda como uno de los tres fijos (`"Tela" | "FOAM" | "Estructuras"`), como
+  `"Otros"` o como el **texto libre** escrito al elegir «Otros» (spec 008). La interfaz
+  muestra **«Espuma»** para FOAM (función `nombreTipo`), pero el valor guardado no
+  cambia: no hay migraciones de datos.
 - `fecha` es timestamp de época (`Date.now()`); la lista se ordena del más reciente
   al más antiguo (ver skill `local-dates` al tocar fechas).
 - Nunca se cambia la clave ni el esquema sin actualizar `docs/constitution.md` y los tests.
@@ -65,6 +66,10 @@ funcionar sin servidor.
 - **Formulario libre y campos nuevos (spec 007)**: nada es obligatorio; la ficha muestra
   «Sin nombre»/«Sin tipo» cuando faltan. Campos **Móvil** y **Código postal** en
   formulario, ficha y buscador; el mapa usa dirección + código postal.
+- **Tipo «Otros» (spec 008)**: el desplegable tiene una cuarta opción «Otros» que abre
+  un campo para escribir el tipo («Toldos»…; vacío = «Otros»). Los tipos no fijos se
+  agrupan en la pestaña de filtro **Otros** (violeta) y comparten ese color en la ficha;
+  los «Sin tipo» siguen solo en «Todos».
 
 ## Forma de trabajar (SDD)
 

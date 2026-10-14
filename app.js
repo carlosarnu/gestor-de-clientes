@@ -47,6 +47,38 @@ function guardarClientes() {
 // Formulario
 // =====================================================
 
+// Campo «Escribe el tipo»: solo existe con la opción «Otros» (spec 008, RF-602)
+const campoTipoOtro = document.getElementById("campo-tipo-otro");
+const tipoOtro = document.getElementById("tipo-otro");
+
+function sincronizarTipoOtro() {
+  const esOtros = formulario.tipo.value === "Otros";
+  campoTipoOtro.hidden = !esOtros;
+  if (!esOtros) tipoOtro.value = "";
+}
+
+// Reset del formulario que también oculta el tipo personalizado
+function resetearFormulario() {
+  formulario.reset();
+  sincronizarTipoOtro();
+}
+
+formulario.tipo.addEventListener("change", sincronizarTipoOtro);
+
+// Carga el tipo del cliente en el desplegable (los tipos escritos a mano
+// vuelven como «Otros» con su texto, RF-605)
+function cargarTipoEnFormulario(tipo) {
+  const valor = texto(tipo);
+  if (valor !== "" && !esTipoFijo(valor)) {
+    formulario.tipo.value = "Otros";
+    tipoOtro.value = valor === "Otros" ? "" : valor;
+  } else {
+    formulario.tipo.value = valor; // uno de los tres fijos o el hueco vacío
+    tipoOtro.value = "";
+  }
+  sincronizarTipoOtro();
+}
+
 formulario.addEventListener("submit", function (evento) {
   evento.preventDefault();
 
@@ -58,6 +90,11 @@ formulario.addEventListener("submit", function (evento) {
 
   const datos = new FormData(formulario);
 
+  // «Otros»: el tipo es lo escrito a mano (o «Otros» si el hueco queda vacío) (RF-602)
+  if (datos.get("tipo") === "Otros") {
+    datos.set("tipo", texto(tipoOtro.value) || "Otros");
+  }
+
   // Si estamos en modo edición, guardamos los cambios y salimos
   if (clienteEditandoId !== null) {
     guardarEdicion(datos);
@@ -68,7 +105,7 @@ formulario.addEventListener("submit", function (evento) {
   guardarClientes();
 
   // Limpiamos el formulario y volvemos a la pestaña "Todos"
-  formulario.reset();
+  resetearFormulario();
   filtroActivo = "Todos";
   pintarFiltros();
   pintarLista();
@@ -124,7 +161,7 @@ function iniciarEdicion(id) {
   formulario.email.value = cliente.email || "";
   formulario.direccion.value = cliente.direccion || "";
   formulario.codigoPostal.value = cliente.codigoPostal || "";
-  formulario.tipo.value = cliente.tipo || "";
+  cargarTipoEnFormulario(cliente.tipo);
   formulario.notas.value = cliente.notas || "";
 
   pintarFormularioModo();
@@ -147,7 +184,7 @@ function pintarFormularioModo() {
 
 function cancelarEdicion() {
   clienteEditandoId = null;
-  formulario.reset();
+  resetearFormulario();
   pintarFormularioModo();
   pintarLista();
 }
@@ -164,7 +201,7 @@ function guardarEdicion(datos) {
   guardarClientes();
 
   clienteEditandoId = null;
-  formulario.reset();
+  resetearFormulario();
   pintarFormularioModo();
   pintarLista();
   pintarAviso(mensajeAviso("actualizado"));
@@ -182,7 +219,7 @@ function eliminarCliente(id) {
   // Si el cliente eliminado era el que se estaba editando, salimos del modo edición
   if (clienteEditandoId === id) {
     clienteEditandoId = null;
-    formulario.reset();
+    resetearFormulario();
     pintarFormularioModo();
   }
 

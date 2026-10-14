@@ -9,10 +9,17 @@ function texto(valor) {
   return (valor || "").toString().trim();
 }
 
-// "Tela" -> "tela", "FOAM" -> "foam", "Estructuras" -> "estructuras",
-// y sin tipo -> "" (el cliente no encaja en ninguna pestaña de tipo, solo en "Todos")
+// "Tela" -> "tela", "FOAM" -> "foam", "Estructuras" -> "estructuras";
+// cualquier tipo escrito («Otros», spec 008) -> "otros"; sin tipo -> ""
 function claseTipo(tipo) {
-  return texto(tipo).toLowerCase();
+  const valor = texto(tipo);
+  if (valor === "") return "";
+  return esTipoFijo(valor) ? valor.toLowerCase() : "otros";
+}
+
+// ¿Es uno de los tres tipos fijos del desplegable? (spec 008)
+function esTipoFijo(tipo) {
+  return ["Tela", "FOAM", "Estructuras"].indexOf(texto(tipo)) !== -1;
 }
 
 // Devuelve el cliente con ese id dentro de la lista, o undefined
@@ -62,9 +69,16 @@ function eliminarClienteDe(lista, id) {
   });
 }
 
-// Filtro de pestañas: "Todos" o un tipo concreto. No modifica la lista original.
+// Filtro de pestañas: "Todos", un tipo concreto o "Otros" (lo que no sea de los tres
+// fijos y tenga tipo escrito, RF-603; los «Sin tipo» solo en "Todos").
+// No modifica la lista original.
 function filtrarClientes(lista, filtro) {
   if (filtro === "Todos") return lista.slice();
+  if (filtro === "Otros") {
+    return lista.filter(function (cliente) {
+      return texto(cliente.tipo) !== "" && !esTipoFijo(cliente.tipo);
+    });
+  }
   return lista.filter(function (cliente) {
     return cliente.tipo === filtro;
   });
@@ -187,6 +201,7 @@ if (typeof module !== "undefined" && module.exports) {
     contenidoMapa,
     nombreTipo,
     normalizar,
-    buscarClientes
+    buscarClientes,
+    esTipoFijo
   };
 }

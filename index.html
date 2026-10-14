@@ -68,7 +68,14 @@
             <option value="Tela">Tela</option>
             <option value="FOAM">Espuma</option>
             <option value="Estructuras">Estructuras</option>
+            <option value="Otros">Otros</option>
           </select>
+        </div>
+
+        <!-- Tipo escrito a mano: solo aparece con «Otros» (spec 008, RF-601/RF-602) -->
+        <div class="campo" id="campo-tipo-otro" hidden>
+          <label for="tipo-otro">Escribe el tipo de cliente</label>
+          <input type="text" id="tipo-otro" name="tipoOtro" autocomplete="off" maxlength="40" placeholder="p. ej. Toldos">
         </div>
 
         <div class="campo campo-completo">
@@ -104,6 +111,7 @@
         <button type="button" class="filtro" data-filtro="Tela">Tela</button>
         <button type="button" class="filtro" data-filtro="FOAM">Espuma</button>
         <button type="button" class="filtro" data-filtro="Estructuras">Estructuras</button>
+        <button type="button" class="filtro" data-filtro="Otros">Otros</button>
       </div>
 
       <div class="lista-clientes" id="lista-clientes"></div>

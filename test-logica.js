@@ -24,7 +24,8 @@ const {
   contenidoMapa,
   nombreTipo,
   normalizar,
-  buscarClientes
+  buscarClientes,
+  esTipoFijo
 } = require("./logica.js");
 
 // Ayuda: un formulario falso con la interfaz de FormData (.get)
@@ -69,6 +70,23 @@ test("claseTipo convierte el tipo a minúsculas para las clases CSS", () => {
   assert.equal(claseTipo("Estructuras"), "estructuras");
 });
 
+test("claseTipo agrupa cualquier tipo escrito en «otros» y deja vacío sin tipo (RF-604)", () => {
+  assert.equal(claseTipo("Otros"), "otros");
+  assert.equal(claseTipo("Toldos"), "otros");
+  assert.equal(claseTipo("Cortinas"), "otros");
+  assert.equal(claseTipo(""), "");
+  assert.equal(claseTipo("  "), "");
+});
+
+test("esTipoFijo solo reconoce Tela, FOAM y Estructuras (RF-601)", () => {
+  assert.equal(esTipoFijo("Tela"), true);
+  assert.equal(esTipoFijo("FOAM"), true);
+  assert.equal(esTipoFijo("Estructuras"), true);
+  assert.equal(esTipoFijo("Otros"), false);
+  assert.equal(esTipoFijo("Toldos"), false);
+  assert.equal(esTipoFijo(""), false);
+});
+
 // ===== alta (RF-011: formato de datos) =====
 
 test("construirCliente crea los 12 campos con id y fecha dados (RF-011, RF-502)", () => {
@@ -92,6 +110,11 @@ test("construirCliente con todo vacío guarda igual (nada es obligatorio, RF-501
   assert.equal(vacio.tipo, "");
   assert.equal(vacio.movil, "");
   assert.equal(vacio.codigoPostal, "");
+});
+
+test("construirCliente conserva el tipo personalizado escrito en «Otros» (RF-602)", () => {
+  const libre = construirCliente(formulario({ tipo: "  Toldos  " }), 2, 1760000000000);
+  assert.equal(libre.tipo, "Toldos"); // espacios recortados, texto tal cual
 });
 
 // ===== edición (RF-007, RF-011) =====
@@ -156,6 +179,19 @@ test("filtrarClientes por tipo solo deja ese tipo y no muta la lista (RF-010)", 
   assert.equal(tela[0].empresa, "Textiles Norte");
   assert.equal(LISTA.length, 3);
   assert.deepEqual(filtrarClientes(LISTA, "Estructuras").map(c => c.id), [1003]);
+});
+
+test("filtrarClientes 'Otros' deja lo no fijo con tipo y excluye vacíos y fijos (RF-603)", () => {
+  const lista = LISTA.concat([
+    { id: 1004, fecha: 1700000300000, empresa: "Toldos Sur", cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipo: "Toldos", notas: "" },
+    { id: 1005, fecha: 1700000400000, empresa: "Sin Tipo SL", cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipo: "", notas: "" },
+    { id: 1006, fecha: 1700000500000, empresa: "Genéricos", cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipo: "Otros", notas: "" }
+  ]);
+  const copia = lista.slice();
+  assert.deepEqual(filtrarClientes(lista, "Otros").map(c => c.id), [1004, 1006]); // libres y «Otros», nunca «Sin tipo»
+  assert.deepEqual(filtrarClientes(lista, "Tela").map(c => c.id), [1001]); // los fijos siguen en su pestaña
+  assert.deepEqual(filtrarClientes(lista, "Todos").length, 6);
+  assert.deepEqual(lista, copia); // no muta
 });
 
 // ===== contador y avisos (RF-012) =====

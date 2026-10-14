@@ -19,6 +19,9 @@
   --estructuras: #525f68;
   --estructuras-suave: #e3e6e9;
   --estructuras-texto: #3a464d;
+  --otros: #6b4f8a;
+  --otros-suave: #ece4f4;
+  --otros-texto: #513a72;
   --radio: 6px;
   --anillo: 0 0 0 3px rgba(29, 36, 31, 0.12);
 }
@@ -106,6 +109,11 @@ h2 {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+/* El atributo hidden debe ganar al display:flex del campo (spec 008) */
+.campo[hidden] {
+  display: none;
 }
 
 .campo label {
@@ -272,6 +280,11 @@ h2 {
   border-color: var(--estructuras);
 }
 
+.filtro[data-filtro="Otros"].activo {
+  background: var(--otros);
+  border-color: var(--otros);
+}
+
 .contador {
   margin: 0;
   font-size: 0.875rem;
@@ -305,6 +318,11 @@ h2 {
 
 .tarjeta-estructuras {
   border-left-color: var(--estructuras);
+}
+
+/* Cualquier tipo personalizado («Otros») comparte el violeta (spec 008) */
+.tarjeta-otros {
+  border-left-color: var(--otros);
 }
 
 .tarjeta.editando {
@@ -353,6 +371,11 @@ h2 {
 .etiqueta-estructuras {
   background: var(--estructuras-suave);
   color: var(--estructuras-texto);
+}
+
+.etiqueta-otros {
+  background: var(--otros-suave);
+  color: var(--otros-texto);
 }
 
 .datos-cliente {
