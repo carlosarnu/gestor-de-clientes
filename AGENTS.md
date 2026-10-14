@@ -1,7 +1,7 @@
 # AGENTS.md — Gestor de Clientes
 
 Web estática y portable para que un comercial autónomo gestione sus clientes
-(empresa, CIF, contacto, teléfono, email, dirección, tipo: Tela, FOAM o Estructuras,
+(empresa, CIF, contacto, teléfono, email, dirección, tipo: Tela, Espuma, Estructuras u Otros,
 y notas) mediante almacenamiento local. Pensada para abrirse con doble clic y
 funcionar sin servidor.
 
@@ -31,10 +31,10 @@ funcionar sin servidor.
 - Esquema del cliente: `{ id, fecha, empresa, cif, contacto, telefono, movil, email,
   direccion, codigoPostal, tipo, notas }`. **Ningún campo es obligatorio** (spec 007):
   lo vacío se muestra como «Sin nombre»/«Sin tipo».
-- `tipo` se guarda como uno de los tres fijos (`"Tela" | "FOAM" | "Estructuras"`), como
-  `"Otros"` o como el **texto libre** escrito al elegir «Otros» (spec 008). La interfaz
-  muestra **«Espuma»** para FOAM (función `nombreTipo`), pero el valor guardado no
-  cambia: no hay migraciones de datos.
+- `tipo` se guarda como uno de los tres fijos (`"Tela" | "Espuma" | "Estructuras"`), como
+  `"Otros"` o como el **texto libre** escrito al elegir «Otros» (spec 008). El valor
+  antiguo «FOAM» se convierte en «Espuma» al cargar (`migrarTipos`, spec 009): ningún
+  cliente guardado se pierde.
 - `fecha` es timestamp de época (`Date.now()`); la lista se ordena del más reciente
   al más antiguo (ver skill `local-dates` al tocar fechas).
 - Nunca se cambia la clave ni el esquema sin actualizar `docs/constitution.md` y los tests.
@@ -45,8 +45,8 @@ funcionar sin servidor.
   conservan `id`, `fecha` y el filtro activo. El borrado pide confirmación dentro de la
   tarjeta («¿Seguro? · Sí, eliminar / No»), sin `confirm()` nativo. Avisos breves en un
   toast de 2,5 s.
-- **Filtros (Todos / Tela / Espuma / Estructuras)**: pestañas con `data-filtro` = valor
-  interno (`"FOAM"` para la pestaña Espuma). El desplegable del formulario funciona igual.
+- **Filtros (Todos / Tela / Espuma / Estructuras / Otros)**: pestañas con `data-filtro` =
+  valor interno (`"Espuma"` para la pestaña Espuma). El desplegable funciona igual.
 - **Buscador por texto (spec 005)**: campo «Buscar cliente» que filtra en vivo mientras
   se escribe, con todas las palabras («y») repartidas entre los campos, ignorando
   acentos y mayúsculas. Se combina con el filtro de tipo y sobreviene a cambios de
@@ -62,7 +62,7 @@ funcionar sin servidor.
   usuario (no conseguía entrar y quiere ver la web antes de convertirla en app de
   escritorio). La app **no** tiene pantalla de clave, roles, panel de administrador ni
   exportar/importar; al arrancar se borran los restos (`gestorAcceso`, `gestorSesion*`).
-  La spec queda como historial en `docs/specs/006-accesos/`.
+  La spec queda como historial en `specs`.
 - **Formulario libre y campos nuevos (spec 007)**: nada es obligatorio; la ficha muestra
   «Sin nombre»/«Sin tipo» cuando faltan. Campos **Móvil** y **Código postal** en
   formulario, ficha y buscador; el mapa usa dirección + código postal.
@@ -70,12 +70,15 @@ funcionar sin servidor.
   un campo para escribir el tipo («Toldos»…; vacío = «Otros»). Los tipos no fijos se
   agrupan en la pestaña de filtro **Otros** (violeta) y comparten ese color en la ficha;
   los «Sin tipo» siguen solo en «Todos».
+- **Renombrado FOAM → Espuma (spec 009)**: el valor interno del tipo pasó a «Espuma»
+  (HTML, CSS, JS y datos) con migración automática al abrir (`migrarTipos`); además
+  cinta de la cabecera a 4 colores, «Correo electrónico» en la ficha y docs al día.
 
 ## Forma de trabajar (SDD)
 
 - No escribas código a lo ciego: sigue Spec-Driven Development (skill `sdd`) —
   constitución → especificación (`spec.md`) → plan (`plan.md`) → tareas (`tasks.md`) →
-  implementación. Las specs viven en `docs/specs/NNN-nombre/`.
+  implementación. Las specs viven en `specs`.
 - Para el flujo SDD completo, selecciona `coordinator` como **agente principal** (selector
   de agentes del TUI, p. ej. `/agent coordinator`) — él orquesta a los subagentes
   `@planner`, `@reviewer` e `@implementer`. Para cambios pequeños que no merecen spec,
@@ -86,7 +89,14 @@ funcionar sin servidor.
 
 ## Memoria
 
-- Al empezar, lee `MEMORY.md`. Al terminar una tarea, actualízala (máximo 50 líneas).
+- Al empezar, lee `MEMORY.md` para conocer el estado del proyecto y las decisiones
+  tomadas.
+- Al terminar una tarea, actualízalo: estado actual, decisiones importantes (con su
+  porqué) y errores a evitar.
+- Mantenlo breve (máximo ~50 líneas): resume o elimina lo que ya no aporte.
+- Si algo se convierte en una regla permanente, propón moverlo a `AGENTS.md` en lugar de
+  dejarlo en la memoria.
+- No guardes nunca datos sensibles (claves, tokens, datos personales).
 
 ## Comandos
 
@@ -102,9 +112,12 @@ funcionar sin servidor.
 
 - ✅ Permitido: JS nativo, CSS puro, `localStorage`, iframe de Google Maps, tests con
   `node --test`, MCP de Chrome DevTools para verificar la interfaz.
+- ✅ Siempre: actualizar `MEMORY.md` al terminar cada tarea.
 - ⚠️ Cuidado: tocar `localStorage` (datos reales del usuario), el orden de los
-  `<script>` en `index.html`, los valores internos guardados (`"FOAM"`), las specs ya
-  cerradas en `docs/specs/` y las fechas (`fecha`).
+  `<script>` en `index.html`, los valores internos del campo `tipo`, las specs ya
+  cerradas en `specs` y las fechas (`fecha`).
+- ⚠️ Pregunta antes: crear archivos nuevos, cambiar el formato de los datos guardados.
+- 🚫 Nunca: añadir dependencias, frameworks o un paso de build.
 - 🚫 Prohibido: frameworks, bundlers, npm, módulos ES, claves de API en texto plano,
   `confirm()`/`alert()` nativos, exigir un servidor para funcionar.
 

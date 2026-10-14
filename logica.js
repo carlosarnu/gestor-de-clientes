@@ -9,7 +9,7 @@ function texto(valor) {
   return (valor || "").toString().trim();
 }
 
-// "Tela" -> "tela", "FOAM" -> "foam", "Estructuras" -> "estructuras";
+// "Tela" -> "tela", "Espuma" -> "espuma", "Estructuras" -> "estructuras";
 // cualquier tipo escrito («Otros», spec 008) -> "otros"; sin tipo -> ""
 function claseTipo(tipo) {
   const valor = texto(tipo);
@@ -19,7 +19,7 @@ function claseTipo(tipo) {
 
 // ¿Es uno de los tres tipos fijos del desplegable? (spec 008)
 function esTipoFijo(tipo) {
-  return ["Tela", "FOAM", "Estructuras"].indexOf(texto(tipo)) !== -1;
+  return ["Tela", "Espuma", "Estructuras"].indexOf(texto(tipo)) !== -1;
 }
 
 // Devuelve el cliente con ese id dentro de la lista, o undefined
@@ -29,7 +29,7 @@ function buscarCliente(lista, id) {
   });
 }
 
-// Rellena los 10 campos de un cliente a partir del formulario.
+// Rellena los 12 campos de un cliente a partir del formulario.
 // Conserva id y fecha de `actual` (los pone él mismo).
 // Todos los datos son opcionales (spec 007): lo que no venga, queda en "".
 function actualizarCliente(actual, datos) {
@@ -67,6 +67,23 @@ function eliminarClienteDe(lista, id) {
   return lista.filter(function (cliente) {
     return cliente.id !== id;
   });
+}
+
+// =====================================================
+// Migración de datos antiguos (spec 009)
+// =====================================================
+
+// Hasta la spec 009 el tipo «Espuma» se guardaba como «FOAM»: al cargar, esos clientes
+// pasan a «Espuma» conservando intactos el resto de campos (los datos son sagrados,
+// regla 3 de la constitución). Devuelve la MISMA lista si no hay nada que migrar.
+function migrarTipos(lista) {
+  let huboCambio = false;
+  const migrada = lista.map(function (cliente) {
+    if (texto(cliente.tipo) !== "FOAM") return cliente;
+    huboCambio = true;
+    return Object.assign({}, cliente, { tipo: "Espuma" });
+  });
+  return huboCambio ? migrada : lista;
 }
 
 // Filtro de pestañas: "Todos", un tipo concreto o "Otros" (lo que no sea de los tres
@@ -139,12 +156,11 @@ function contenidoMapa(direccion, enLinea) {
 // Buscador de texto y etiquetas (spec 005) - sin DOM
 // =====================================================
 
-// Nombre visible de cada tipo en la interfaz: la etiqueta interna sigue siendo "FOAM"
-// y sin tipo quedado queda "Sin tipo" (spec 007, RF-504)
+// Nombre visible de cada tipo en la interfaz: «Sin tipo» si no hay y el texto tal cual
+// si hay (el «FOAM» antiguo ya no existe: se migra a «Espuma» al cargar, spec 009)
 function nombreTipo(tipo) {
   const valor = texto(tipo);
-  if (valor === "") return "Sin tipo";
-  return valor === "FOAM" ? "Espuma" : valor;
+  return valor === "" ? "Sin tipo" : valor;
 }
 
 // Minúsculas y sin acentos para comparar búsquedas ("Constitucion" ~ "Constitución")
@@ -202,6 +218,7 @@ if (typeof module !== "undefined" && module.exports) {
     nombreTipo,
     normalizar,
     buscarClientes,
-    esTipoFijo
+    esTipoFijo,
+    migrarTipos
   };
 }

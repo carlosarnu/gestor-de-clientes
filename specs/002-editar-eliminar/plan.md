@@ -3,8 +3,8 @@
 | Campo | Valor |
 |---|---|
 | **Spec** | `002-editar-eliminar` (aprobada) |
-| **Archivo** | `docs/specs/002-editar-eliminar/plan.md` |
-| **Archivos a modificar** | `index.html`, `styles.css`, `app.js` |
+| **Archivo** | `..` |
+| **Archivos a modificar** | `../../index.html`, `styles.css`, `app.js` |
 | **Reglas** | Constitución: sin frameworks, sin librerías, funciona con doble clic (`file://`), interfaz en español, código/variables en inglés y comentarios en español. |
 
 Este documento dice **qué** cambiar y **dónde**, sin escribir el código completo. Los fragmentos son
@@ -47,7 +47,7 @@ editado. Cambiar de filtro nunca lo toca.
 
 ---
 
-## 2. Cambios en `index.html`
+## 2. Cambios en `../../index.html`
 
 Los botones de la tarjeta **no** se tocan aquí: se generan desde JS en `crearTarjeta`. El HTML solo
 cambia en el bloque del formulario y añade el contenedor del toast.
@@ -65,7 +65,7 @@ idénticos: el formulario es el mismo para crear y para editar (decisión P1).
 
 ---
 
-## 3. Cambios en `app.js`
+## 3. Cambios en `../../app.js`
 
 ### 3.1 Funciones nuevas
 
@@ -156,7 +156,7 @@ contador y visibles en cada llamada, por lo que basta con llamarla tras cada ope
 
 ---
 
-## 4. Cambios en `styles.css`
+## 4. Cambios en `../../styles.css`
 
 Todas las clases nuevas siguen el diseño actual (tras el rediseño de la spec `003-retrovisual`:
 paneles blancos con borde `--linea` y radio 6-8 px, tinta `#1d241f` como color de acción, colores de
@@ -183,7 +183,7 @@ obligaría a alternarlo desde JS); se controla solo con `opacity`/`visibility` +
 
 ## 5. Toast: implementación nativa simple
 
-- Un único `<div class="toast" id="toast" role="status" aria-live="polite">` fijo en `index.html`
+- Un único `<div class="toast" id="toast" role="status" aria-live="polite">` fijo en `../../index.html`
   (sin librerías, sin dependencias).
 - `pintarAviso(mensaje)` escribe `mensaje` con `textContent` (nunca `innerHTML` → sin riesgo XSS),
   añade `visible`, y con `setTimeout(..., 2550)` la quita.

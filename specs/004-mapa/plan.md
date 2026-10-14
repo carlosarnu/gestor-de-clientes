@@ -15,7 +15,7 @@
 - Carga perezosa: `loading="lazy"` + `title` accesible (RF-204).
 - Eventos `online`/`offline` de la ventana → `pintarLista()` para refrescar los cuadros (RF-203).
 
-## 2. Cambios en `logica.js` (funciones puras, con tests)
+## 2. Cambios en `../../logica.js` (funciones puras, con tests)
 
 | Función | Qué hace |
 |---|---|
@@ -26,19 +26,19 @@
 
 Ninguna toca `document` o `navigator`: el estado de red entra por parámetro.
 
-## 3. Cambios en `app.js` (solo presentación)
+## 3. Cambios en `../../app.js` (solo presentación)
 
 - En `crearTarjeta()`, después de la fila de dirección (y antes de las notas), si
   `debeMostrarMapa(cliente.direccion)` se inyecta `.mapa-caja`:
   - `enLinea = navigator.onLine !== false` (con `try` por seguridad);
   - `"iframe"` → `<iframe class="mapa-mapa" title="Mapa de …" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src=…>` + enlace pequeño debajo;
   - `"enlace"` → solo el enlace grande «Ver en Google Maps».
-- Todo con `escapar()` para el `title` y `encodeURIComponent` (vía `logica.js`) para las URLs.
-- Al final de `app.js`: `window.addEventListener("online", pintarLista)` y `"offline"` (RF-203).
+- Todo con `escapar()` para el `title` y `encodeURIComponent` (vía `../../logica.js`) para las URLs.
+- Al final de `../../app.js`: `window.addEventListener("online", pintarLista)` y `"offline"` (RF-203).
 - **No se tocan**: `formulario`, `guardarClientes`, `cargarClientes`, `guardarEdicion`,
-  `eliminarCliente`, filtros ni `logica.js` de edición/borrado.
+  `eliminarCliente`, filtros ni `../../logica.js` de edición/borrado.
 
-## 4. Cambios en `styles.css`
+## 4. Cambios en `../../styles.css`
 
 | Clase | Estilo resumido |
 |---|---|
@@ -48,7 +48,7 @@ Ninguna toca `document` o `navigator`: el estado de red entra por parámetro.
 
 Responsive: a 375 px el iframe ocupa el ancho de la tarjeta sin desbordamiento (RF-205).
 
-## 5. Tests nuevos (`test-logica.js`)
+## 5. Tests nuevos (`../../test-logica.js`)
 
 - `debeMostrarMapa`: dirección vacía/espacios → `false`; con contenido → `true`.
 - `urlMapa`: contiene `output=encode`, codifica espacios y acentos (`Calle Mayor 12` → `Calle%20Mayor%2012`).

@@ -4,15 +4,15 @@
 
 ---
 
-## 1. `logica.js` (con tests)
+## 1. `../../logica.js` (con tests)
 
 | Función | Cambio |
 |---|---|
-| `esTipoFijo(tipo)` | **Nueva**: `true` para Tela/FOAM/Estructuras (los tres fijos) |
+| `esTipoFijo(tipo)` | **Nueva**: `true` para Tela/Espuma/Estructuras (los tres fijos) |
 | `claseTipo(tipo)` | Vacío → `""`; fijo → minúsculas; **cualquier otro texto → `"otros"`** (RF-604) |
 | `filtrarClientes(lista, filtro)` | Nuevo caso `"Otros"`: tipo no fijo y no vacío (RF-603) |
 
-## 2. `index.html`
+## 2. `../../index.html`
 
 - `<option value="Otros">Otros</option>` en el desplegable.
 - Campo nuevo debajo: `<div class="campo" id="campo-tipo-otro" hidden>` con
@@ -20,7 +20,7 @@
   `maxlength="40"`.
 - Pestaña `<button data-filtro="Otros">Otros</button>`.
 
-## 3. `app.js`
+## 3. `../../app.js`
 
 - `sincronizarTipoOtro()`: muestra/oculta el campo según `formulario.tipo.value`
   (listener `change` + se llama tras cualquier reset vía `resetearFormulario()`).
@@ -29,7 +29,7 @@
 - `iniciarEdicion`: vacío → placeholder; fijo → ese valor; si no → «Otros» + campo con
   el texto («Otros» literal deja el campo vacío) (RF-605).
 
-## 4. `styles.css`
+## 4. `../../styles.css`
 
 - `:root`: `--otros: #6b4f8a`, `--otros-suave: #ece4f4`, `--otros-texto: #513a72`.
 - `.campo[hidden] { display: none; }` (**imprescindible**: `.campo` es `flex` y ganaría

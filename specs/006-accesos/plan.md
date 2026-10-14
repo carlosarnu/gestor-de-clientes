@@ -4,7 +4,7 @@
 
 ---
 
-## 1. `logica.js` (funciones puras, con tests; RF-404/406/407)
+## 1. `../../logica.js` (funciones puras, con tests; RF-404/406/407)
 
 | Función | Qué hace |
 |---|---|
@@ -15,7 +15,7 @@
 
 En tests se asegura `globalThis.crypto` con `node:crypto` `webcrypto` si faltara.
 
-## 2. `index.html`
+## 2. `../../index.html`
 
 - `<div id="pantalla-acceso">` (overlay): clave (`type="password"`, `inputmode="numeric"`),
   botón Entrar, `<p id="error-acceso">`, checkbox «mantener sesión iniciada», nota
@@ -27,7 +27,7 @@ En tests se asegura `globalThis.crypto` con `node:crypto` `webcrypto` si faltara
   confirmación de importación (Sí, reemplazar / Cancelar) y bloque «Cambiar claves»
   (dos inputs + guardar).
 
-## 3. `app.js` (presentación y estado)
+## 3. `../../app.js` (presentación y estado)
 
 - Claves/almacenamiento: `gestorAcceso` (localStorage, hashes `{ usuario, administrador }`,
   opcional, sustituye a los por defecto), `gestorSesion` (sessionStorage) y
@@ -45,7 +45,7 @@ En tests se asegura `globalThis.crypto` con `node:crypto` `webcrypto` si faltara
   reemplazar + `pintarLista()`. Inválido → toast de error, datos intactos.
 - Cambiar claves: hash de ambos campos nuevos → `gestorAcceso` → toast + limpiar campos.
 
-## 4. `styles.css`
+## 4. `../../styles.css`
 
 | Clase | Estilo resumido |
 |---|---|
@@ -54,7 +54,7 @@ En tests se asegura `globalThis.crypto` con `node:crypto` `webcrypto` si faltara
 | `.panel-admin` | bloque con borde `--linea`, cabecera y fila de botones envueltos |
 | `.confirmar-importacion` | barra dentro del panel (Sí, reemplazar en mostaza-rojo, Cancelar) |
 
-## 5. Tests nuevos (`test-logica.js`, +9)
+## 5. Tests nuevos (`../../test-logica.js`, +9)
 
 - `hashTexto`: vector conocido SHA-256; mismo texto → mismo hash; distinto → distinto;
   `null` no revienta.

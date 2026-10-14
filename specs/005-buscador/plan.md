@@ -4,7 +4,7 @@
 
 ---
 
-## 1. Cambios en `logica.js` (funciones puras, con tests)
+## 1. Cambios en `../../logica.js` (funciones puras, con tests)
 
 | Función | Qué hace |
 |---|---|
@@ -12,7 +12,7 @@
 | `normalizar(valor)` | minúsculas + quita acentos (NFD + `[\u0300-\u036f]`) y espacios (RF-303) |
 | `buscarClientes(lista, consulta)` | consulta vacía → lista completa; si no, divide en palabras y **todas** deben aparecer en el texto normalizado del cliente (empresa, cif, contacto, telefono, email, direccion, notas, tipo **y** su nombre en español). No muta la lista (RF-302/303) |
 
-## 2. Cambios en `index.html`
+## 2. Cambios en `../../index.html`
 
 - Botón de filtro `data-filtro="FOAM"`: texto «FOAM» → **«Espuma»** (el `data-filtro` NO cambia).
 - Opción del desplegable: `<option value="FOAM">Espuma</option>` (el `value` NO cambia).
@@ -20,7 +20,7 @@
 - Nuevo campo entre `.lista-cabecera` y `.filtros`:
   `<label for="buscador">Buscar cliente</label><input type="search" id="buscador" … autocomplete="off">`.
 
-## 3. Cambios en `app.js` (solo presentación)
+## 3. Cambios en `../../app.js` (solo presentación)
 
 - Estado: `let textoBusqueda = "";` + elemento `buscador` + listener `input` →
   `textoBusqueda = buscador.value; pintarLista();` (sin reiniciar al cambiar de filtro ni al editar).
@@ -30,7 +30,7 @@
 - Badge de la tarjeta: texto con `nombreTipo(cliente.tipo)` (la clase CSS sigue siendo `claseTipo`).
 - El contador ya usa `visibles.length`: refleja la búsqueda sin cambios.
 
-## 4. Cambios en `styles.css`
+## 4. Cambios en `../../styles.css`
 
 | Clase | Estilo resumido |
 |---|---|
@@ -38,7 +38,7 @@
 | `.buscador label` | `font-size: .875rem; font-weight: 600; color: var(--tinta-media);` |
 | `.buscador input` | `width: 100%; font: inherit; padding: 12px 14px;` (≥44 px) borde `--linea`, radio `--radio`, fondo `--superficie`, focus ring igual que el resto |
 
-## 5. Tests nuevos (`test-logica.js`)
+## 5. Tests nuevos (`../../test-logica.js`)
 
 - `nombreTipo`: `"FOAM"`→`"Espuma"`, `"Tela"`→`"Tela"`, `"Estructuras"`→`"Estructuras"`.
 - `normalizar`: mayúsculas, acentos, ñ, espacios sobrantes.

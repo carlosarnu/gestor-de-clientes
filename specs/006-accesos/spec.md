@@ -109,11 +109,11 @@ exportación/importación para mover datos entre equipos — sin romper el model
 ## 8. Decisiones
 
 1. **Claves por defecto** `2468` (usuario) y `9753` (administrador), documentadas en
-   `AGENTS.md`/`MEMORY.md`; el administrador debe cambiarlas.
+   `../../AGENTS.md`/`MEMORY.md`; el administrador debe cambiarlas.
 2. **SHA-256 con WebCrypto** (`crypto.subtle`, nativo; `file://` es contexto seguro) —
    en el código solo viven los hashes, jamás el PIN en claro.
 3. **Importar reemplaza** (no fusiona) tras confirmación con conteos — predecible y la
    exportación ya es la copia de seguridad.
-4. La pantalla de acceso vive en el mismo `index.html` (sin archivos extra).
+4. La pantalla de acceso vive en el mismo `../../index.html` (sin archivos extra).
 5. La validación de sesión es **UI disuasoria** (RF-409): quien tenga acceso al archivo
    podrá leer los datos; se acepta explícitamente.

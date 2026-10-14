@@ -32,7 +32,13 @@ let temporizadorAviso = null;
 function cargarClientes() {
   try {
     const datos = localStorage.getItem(CLAVE_STORAGE);
-    return datos ? JSON.parse(datos) : [];
+    const lista = datos ? JSON.parse(datos) : [];
+    // Migración spec 009: el tipo antiguo «FOAM» pasa a «Espuma» (solo si hay cambio)
+    const migrada = migrarTipos(Array.isArray(lista) ? lista : []);
+    if (migrada !== lista) {
+      localStorage.setItem(CLAVE_STORAGE, JSON.stringify(migrada));
+    }
+    return migrada;
   } catch (error) {
     // Si los datos están corruptos, empezamos de cero
     return [];
@@ -196,7 +202,7 @@ function guardarEdicion(datos) {
     return;
   }
 
-  // Actualizamos los 10 campos conservando id y fecha originales (ver logica.js)
+  // Actualizamos los 12 campos conservando id y fecha originales (ver logica.js)
   clientes = aplicarEdicion(clientes, clienteEditandoId, datos);
   guardarClientes();
 
@@ -323,7 +329,7 @@ function crearTarjeta(cliente) {
         fila("Persona de contacto", cliente.contacto) +
         fila("Teléfono", cliente.telefono) +
         fila("Móvil", cliente.movil) +
-        fila("Correo", cliente.email) +
+        fila("Correo electrónico", cliente.email) +
         fila("Dirección", cliente.direccion) +
         fila("Código postal", cliente.codigoPostal) +
       "</dl>" +

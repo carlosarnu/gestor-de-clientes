@@ -11,7 +11,7 @@
 
 ## 1. Contexto y objetivo
 
-Hoy el desplegable «Tipo de cliente» solo admite Tela / Espuma (FOAM) / Estructuras, y el
+Hoy el desplegable «Tipo de cliente» solo admite Tela / Espuma / Estructuras, y el
 cliente puede no tener tipo («Sin tipo», spec 007). El usuario pide una **cuarta opción
 «Otros»**: al elegirla aparece un campo para **escribir** el tipo («Toldos», «Cortinas»…),
 y además esa opción debe existir en el **filtro** de la lista.
@@ -27,7 +27,7 @@ libre dentro de un conjunto de valores conocidos), con su pestaña y su color.
   «Escribe el tipo de cliente»; y SHALL guardar como `tipo` ese texto tal cual (espacios
   recortados), o **«Otros»** si el campo queda vacío.
 - **RF-603** — La lista SHALL incluir la pestaña de filtro **«Otros»**: mostrará los
-  clientes cuyo `tipo` **no** esté entre Tela/FOAM/Estructuras **y** no esté vacío (los
+  clientes cuyo `tipo` **no** esté entre Tela/Espuma/Estructuras **y** no esté vacío (los
   «Sin tipo» siguen apareciendo solo en «Todos», RF-504).
 - **RF-604** — Los clientes con tipo «Otros»/personalizado SHALL mostrar la etiqueta y la
   espina de color **violeta** (nuevo material) en la ficha, con la etiqueta = el texto
@@ -47,7 +47,7 @@ libre dentro de un conjunto de valores conocidos), con su pestaña y su color.
   «Todos»).
 - **Given** un cliente «Cortinas», **when** se edita, **then** el desplegable está en
   «Otros» y el campo muestra «Cortinas».
-- **Given** clientes Tela/FOAM/Estructuras, **when** se filtra «Otros», **then** no
+- **Given** clientes Tela/Espuma/Estructuras, **when** se filtra «Otros», **then** no
   aparecen; y al revés.
 - **Given** `node --test` y el navegador, **then** todo verde, móvil 375 sin desbordes y
   consola limpia.
@@ -55,8 +55,9 @@ libre dentro de un conjunto de valores conocidos), con su pestaña y su color.
 ## 4. Casos límite
 
 - «Otros» + texto = uno de los tres fijos escrito a mano (p. ej. «Tela»): se guarda tal
-  cual; al filtrar «Tela» NO aparece (comparación exacta) pero sí en «Otros» — caso
-  documentado, sin normalizar para no inventar lógica.
+  cual y **se comporta como el tipo fijo** — aparece en la pestaña Tela y con su color, y
+  queda fuera de «Otros». (Texto corregido el 2026-10-14 en la spec 009: el original
+  decía lo contrario de lo que hace el código.)
 - Texto solo con espacios → se recorta; vacío → «Otros».
 - Editar tras borrar el texto de «Otros» → vuelve a «Otros».
 

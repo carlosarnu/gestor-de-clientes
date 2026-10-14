@@ -39,7 +39,7 @@ un servicio de terceros que requiere internet, por lo que la spec obliga a **deg
 - **RF-206** — Al editar y guardar la dirección de un cliente (spec 002), el mapa de su tarjeta SHALL
   actualizarse; si se vacía la dirección, el cuadro SHALL desaparecer.
 - **RF-207** — El cambio SHALL ser solo de presentación: ni el formulario, ni `localStorage`
-  (clave `gestorClientes`, 10 campos), ni la lógica de `logica.js` se alteran; la app seguirá
+  (clave `gestorClientes`, 10 campos), ni la lógica de `../../logica.js` se alteran; la app seguirá
   abriéndose con doble clic (`file://`).
 
 ## 3. Criterios de aceptación

@@ -12,7 +12,7 @@ Cambio.
   para y pregunta.
 - Un cambio de requisitos se hace primero en la spec, luego en el plan y las tareas, y
   por último en el código.
-- Cada spec vive en su carpeta: `docs/specs/NNN-nombre/` con `spec.md`, `plan.md` y
+- Cada spec vive en su carpeta: `../../../specs` con `spec.md`, `plan.md` y
   `tasks.md`.
 - Al terminar cada fase, actualiza `MEMORY.md`.
 ## Plantilla de spec (spec.md)

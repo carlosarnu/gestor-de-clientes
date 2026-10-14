@@ -25,7 +25,8 @@ const {
   nombreTipo,
   normalizar,
   buscarClientes,
-  esTipoFijo
+  esTipoFijo,
+  migrarTipos
 } = require("./logica.js");
 
 // Ayuda: un formulario falso con la interfaz de FormData (.get)
@@ -44,16 +45,18 @@ const CLIENTE_V1 = {
   cif: "B12345678",
   contacto: "Ana",
   telefono: "600111222",
+  movil: "655000111",
   email: "ana@textilesnorte.es",
   direccion: "Pol. Ind. Norte 4",
+  codigoPostal: "28013",
   tipo: "Tela",
   notas: "Pide presupuesto"
 };
 
 const LISTA = [
   CLIENTE_V1,
-  { id: 1002, fecha: 1700000100000, empresa: "Asientos Vega", cif: "", contacto: "", telefono: "633444555", email: "", direccion: "", tipo: "FOAM", notas: "" },
-  { id: 1003, fecha: 1700000200000, empresa: "Estructuras Delta", cif: "", contacto: "", telefono: "699888777", email: "", direccion: "", tipo: "Estructuras", notas: "" }
+  { id: 1002, fecha: 1700000100000, empresa: "Asientos Vega", cif: "", contacto: "", telefono: "633444555", movil: "", email: "", direccion: "", codigoPostal: "", tipo: "Espuma", notas: "" },
+  { id: 1003, fecha: 1700000200000, empresa: "Estructuras Delta", cif: "", contacto: "", telefono: "699888777", movil: "", email: "", direccion: "", codigoPostal: "", tipo: "Estructuras", notas: "" }
 ];
 
 // ===== utilidades =====
@@ -66,7 +69,7 @@ test("texto quita espacios y trata vacíos como cadena vacía", () => {
 
 test("claseTipo convierte el tipo a minúsculas para las clases CSS", () => {
   assert.equal(claseTipo("Tela"), "tela");
-  assert.equal(claseTipo("FOAM"), "foam");
+  assert.equal(claseTipo("Espuma"), "espuma");
   assert.equal(claseTipo("Estructuras"), "estructuras");
 });
 
@@ -78,9 +81,9 @@ test("claseTipo agrupa cualquier tipo escrito en «otros» y deja vacío sin tip
   assert.equal(claseTipo("  "), "");
 });
 
-test("esTipoFijo solo reconoce Tela, FOAM y Estructuras (RF-601)", () => {
+test("esTipoFijo solo reconoce Tela, Espuma y Estructuras (RF-601)", () => {
   assert.equal(esTipoFijo("Tela"), true);
-  assert.equal(esTipoFijo("FOAM"), true);
+  assert.equal(esTipoFijo("Espuma"), true);
   assert.equal(esTipoFijo("Estructuras"), true);
   assert.equal(esTipoFijo("Otros"), false);
   assert.equal(esTipoFijo("Toldos"), false);
@@ -91,7 +94,7 @@ test("esTipoFijo solo reconoce Tela, FOAM y Estructuras (RF-601)", () => {
 
 test("construirCliente crea los 12 campos con id y fecha dados (RF-011, RF-502)", () => {
   const nuevo = construirCliente(
-    formulario({ empresa: "  Muebles Rápido  ", cif: "A1", contacto: "", telefono: " 611 ", movil: "622333444", email: "", direccion: "Calle Luna 5", codigoPostal: "28002", tipo: "FOAM", notas: "nada" }),
+    formulario({ empresa: "  Muebles Rápido  ", cif: "A1", contacto: "", telefono: " 611 ", movil: "622333444", email: "", direccion: "Calle Luna 5", codigoPostal: "28002", tipo: "Espuma", notas: "nada" }),
     555,
     1760000000000
   );
@@ -133,7 +136,7 @@ test("aplicarEdicion conserva id y fecha y no duplica el cliente (RF-007)", () =
 });
 
 test("aplicarEdicion con campos de formulario vacíos deja cadena vacía (tolerancia v1, RF-011)", () => {
-  const editada = aplicarEdicion(LISTA, 1002, formulario({ empresa: "Asientos Vega", cif: undefined, contacto: undefined, telefono: "633", email: undefined, direccion: undefined, tipo: "FOAM", notas: undefined }));
+  const editada = aplicarEdicion(LISTA, 1002, formulario({ empresa: "Asientos Vega", cif: undefined, contacto: undefined, telefono: "633", email: undefined, direccion: undefined, tipo: "Espuma", notas: undefined }));
   const editado = buscarCliente(editada, 1002);
   assert.equal(editado.cif, "");
   assert.equal(editado.notas, "");
@@ -252,10 +255,11 @@ test("contenidoMapa devuelve enlace sin conexión y nada sin dirección (RF-203/
 
 // ===== buscador de texto y etiquetas (spec 005) =====
 
-test("nombreTipo muestra Espuma en la interfaz y «Sin tipo» si está vacío (RF-301, RF-504)", () => {
-  assert.equal(nombreTipo("FOAM"), "Espuma");
+test("nombreTipo muestra «Sin tipo» si está vacío y el texto tal cual si no (RF-504)", () => {
+  assert.equal(nombreTipo("Espuma"), "Espuma");
   assert.equal(nombreTipo("Tela"), "Tela");
   assert.equal(nombreTipo("Estructuras"), "Estructuras");
+  assert.equal(nombreTipo("Otros"), "Otros");
   assert.equal(nombreTipo(""), "Sin tipo");
   assert.equal(nombreTipo(null), "Sin tipo");
 });
@@ -268,7 +272,7 @@ test("normalizar quita mayúsculas, acentos y sobrantes (RF-303)", () => {
 
 const LISTA_BUSCAR = [
   { id: 1, fecha: 1, empresa: "Textiles Norte", cif: "B12345678", contacto: "Nuria Peña", telefono: "600111222", movil: "611999888", email: "nuria@norte.es", direccion: "Calle Sol 1, Madrid", codigoPostal: "28001", tipo: "Tela", notas: "" },
-  { id: 2, fecha: 2, empresa: "Asientos Vega", cif: "", contacto: "Luis", telefono: "633444555", movil: "", email: "", direccion: "", codigoPostal: "", tipo: "FOAM", notas: "Pide presupuesto en OCTUBRE" },
+  { id: 2, fecha: 2, empresa: "Asientos Vega", cif: "", contacto: "Luis", telefono: "633444555", movil: "", email: "", direccion: "", codigoPostal: "", tipo: "Espuma", notas: "Pide presupuesto en OCTUBRE" },
   { id: 3, fecha: 3, empresa: "Estructuras Delta", cif: "", contacto: "", telefono: "699888777", movil: "", email: "", direccion: "Avenida de la Constitución 4, Sevilla", codigoPostal: "41001", tipo: "Estructuras", notas: "Obra grande" }
 ];
 
@@ -294,9 +298,8 @@ test("buscarClientes ignora acentos y encuentra por teléfono (RF-303)", () => {
   assert.deepEqual(buscarClientes(LISTA_BUSCAR, "633444").map(c => c.id), [2]);
 });
 
-test("buscarClientes encuentra por tipo con «espuma» y con «foam» (RF-301/RF-302)", () => {
+test("buscarClientes encuentra por tipo con «espuma» y con «tela» (RF-301/RF-302)", () => {
   assert.deepEqual(buscarClientes(LISTA_BUSCAR, "espuma").map(c => c.id), [2]);
-  assert.deepEqual(buscarClientes(LISTA_BUSCAR, "foam").map(c => c.id), [2]);
   assert.deepEqual(buscarClientes(LISTA_BUSCAR, "tela").map(c => c.id), [1]);
 });
 
@@ -310,4 +313,26 @@ test("buscarClientes encuentra por móvil y por código postal (RF-502)", () => 
   assert.deepEqual(buscarClientes(LISTA_BUSCAR, "28001").map(c => c.id), [1]);
   assert.deepEqual(buscarClientes(LISTA_BUSCAR, "41001").map(c => c.id), [3]);
   assert.equal(buscarClientes(LISTA_BUSCAR, "000555").length, 0); // no existe en ningún sitio
+});
+
+// ===== migración FOAM -> Espuma (spec 009) =====
+
+test("migrarTipos cambia el tipo antiguo «FOAM» a «Espuma» sin tocar nada más (RF-702)", () => {
+  const lista = [
+    { id: 1, fecha: 1, empresa: "Asientos Vega", cif: "", contacto: "", telefono: "633", movil: "", email: "", direccion: "", codigoPostal: "", tipo: "FOAM", notas: "se conserva" },
+    { id: 2, fecha: 2, empresa: "Textiles Norte", cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipo: "Tela", notas: "" }
+  ];
+  const migrada = migrarTipos(lista);
+  assert.equal(migrada[0].tipo, "Espuma");
+  assert.equal(migrada[0].notas, "se conserva"); // los datos sagrados intactos
+  assert.equal(migrada[0].id, 1);
+  assert.equal(migrada[1].tipo, "Tela"); // el resto de tipos no se tocan
+  assert.equal(lista[0].tipo, "FOAM"); // la lista original queda como estaba
+});
+
+test("migrarTipos con nada que migrar devuelve la MISMA lista (idempotente, RF-702)", () => {
+  const lista = [{ id: 1, fecha: 1, empresa: "", cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipo: "Espuma", notas: "" }];
+  assert.equal(migrarTipos(lista), lista);
+  const vacia = [];
+  assert.equal(migrarTipos(vacia), vacia);
 });
