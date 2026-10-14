@@ -5,6 +5,12 @@
 // Clave que usamos para guardar los datos en el navegador
 const CLAVE_STORAGE = "gestorClientes";
 
+// Modo de datos (spec 011, RF-902): en la app de escritorio (Electron) el puente
+// window.gestorDatos (contextBridge + IPC síncrono) es la fuente única de verdad
+// (Documentos\Gestor de Clientes\clientes.json) y NO se usa localStorage;
+// en la web no existe el puente y todo sigue exactamente como siempre.
+const EN_ESCRITORIO = typeof window.gestorDatos !== "undefined";
+
 // Elementos de la página
 const formulario = document.getElementById("formulario-cliente");
 const listaClientes = document.getElementById("lista-clientes");
@@ -17,12 +23,26 @@ const panelFormulario = document.getElementById("panel-formulario");
 const aviso = document.getElementById("toast");
 const campoBuscador = document.getElementById("buscador");
 
+// Copia de seguridad (spec 011, RF-901)
+const botonExportar = document.getElementById("boton-exportar");
+const botonImportar = document.getElementById("boton-importar");
+const archivoImportar = document.getElementById("archivo-importar");
+const panelConfirmacionImportar = document.getElementById("confirmacion-importacion");
+const textoConfirmacionImportar = document.getElementById("confirmacion-importacion-texto");
+const botonReemplazar = document.getElementById("boton-reemplazar");
+const botonCancelarImportacion = document.getElementById("boton-cancelar-importacion");
+
 // Estado de la aplicación
+// ¿Existía el archivo de datos al arrancar? Solo tiene sentido en escritorio:
+// sirve para el mensaje de migración en 2 clics (spec 011, RF-903). Se declara
+// ANTES de cargarClientes() porque esa función lo rellena al arrancar.
+let archivoInicialExiste = false;
 let clientes = cargarClientes();
 let filtroActivo = "Todos";
 let textoBusqueda = ""; // texto del buscador (spec 005)
 let clienteEditandoId = null; // id del cliente en edición, o null si no se está editando
 let confirmandoEliminarId = null; // id de la tarjeta mostrando "¿Seguro?", o null si no hay ninguna
+let importacionPendiente = null; // clientes del fichero esperando confirmación, o null
 let temporizadorAviso = null;
 
 // =====================================================
@@ -30,6 +50,31 @@ let temporizadorAviso = null;
 // =====================================================
 
 function cargarClientes() {
+  // ===== Escritorio (spec 011, RF-902/RF-903): fuente única = clientes.json =====
+  if (EN_ESCRITORIO) {
+    const archivo = window.gestorDatos.leer();
+    archivoInicialExiste = Boolean(archivo && archivo.archivoExiste);
+
+    // Si el archivo estaba dañado, el proceso principal ya lo renombró a
+    // «clientes-daños-…json» (RF-903) y llega clientes: null → arrancamos vacíos.
+    // Si no existía (archivoExiste: false) también llega null → lista vacía.
+    const lista = archivo && Array.isArray(archivo.clientes) ? archivo.clientes : [];
+
+    // Migración spec 009 («FOAM» → «Espuma») también al leer el archivo (RF-902).
+    // Si hubo cambio, lo escribimos en el archivo; un fallo de escritura NUNCA
+    // vacía la lista (mismo criterio RF-802 que en la web).
+    const migrada = migrarTipos(lista);
+    if (migrada !== lista) {
+      try {
+        window.gestorDatos.escribir(JSON.stringify(migrada));
+      } catch (error) {
+        // La lista en memoria sigue siendo la correcta
+      }
+    }
+    return migrada;
+  }
+
+  // ===== Web: comportamiento original intacto (RF-802) =====
   // 1) Lectura y parseo: si fallan, empezamos de cero (RF-802)
   let lista;
   try {
@@ -55,6 +100,16 @@ function cargarClientes() {
 }
 
 function guardarClientes() {
+  // Punto único de escritura (spec 011, RF-902): en escritorio se escribe el
+  // JSON completo en clientes.json (el puente crea la carpeta si no existe);
+  // en la web, localStorage como siempre.
+  if (EN_ESCRITORIO) {
+    window.gestorDatos.escribir(JSON.stringify(clientes));
+    // Ya hay archivo (lo acabamos de crear o actualizar): el aviso de migración
+    // deja de proceder aunque después se vacíe la lista (RF-903)
+    archivoInicialExiste = true;
+    return;
+  }
   localStorage.setItem(CLAVE_STORAGE, JSON.stringify(clientes));
 }
 
@@ -285,6 +340,120 @@ function pintarAviso(mensaje) {
 }
 
 // =====================================================
+// Copia de seguridad: exportar e importar (spec 011, RF-901)
+// =====================================================
+
+// Descarga los clientes actuales como "clientes-AAAA-MM-DD.json"
+function exportarClientes() {
+  const nombre = nombreArchivoExportacion(new Date());
+  const contenido = JSON.stringify(clientes, null, 2);
+  const blob = new Blob([contenido], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+
+  // <a download> con Blob funciona también abriendo index.html con doble clic (file://)
+  const enlace = document.createElement("a");
+  enlace.href = url;
+  enlace.download = nombre;
+  document.body.appendChild(enlace);
+  enlace.click();
+  enlace.remove();
+
+  // Se revoca pasados unos ms: si no, algún navegador cancela la descarga
+  setTimeout(function () {
+    URL.revokeObjectURL(url);
+  }, 1000);
+
+  pintarAviso("Copia exportada: " + nombre);
+}
+
+botonExportar.addEventListener("click", exportarClientes);
+
+// Abre el selector de ficheros (el input está oculto)
+botonImportar.addEventListener("click", function () {
+  archivoImportar.click();
+});
+
+// Al elegir un fichero se lee su texto y se pasa a revisión;
+// el input se vacía enseguida para poder volver a elegir el mismo archivo
+archivoImportar.addEventListener("change", function () {
+  const archivo = archivoImportar.files && archivoImportar.files[0];
+  archivoImportar.value = "";
+  if (!archivo) return;
+
+  const lector = new FileReader();
+  lector.addEventListener("load", function () {
+    revisarImportacion(String(lector.result || ""));
+  });
+  lector.addEventListener("error", function () {
+    pintarAviso("No se ha podido leer el archivo");
+  });
+  lector.readAsText(archivo);
+});
+
+// Valida el fichero importado (la validación pura vive en logica.js):
+// con error se avisa y NO se toca nada; si es válido se abre la
+// confirmación en línea con los contadores (nunca confirm()/alert())
+function revisarImportacion(textoJson) {
+  const resultado = importarClientes(textoJson);
+
+  if (resultado.error) {
+    importacionPendiente = null;
+    ocultarConfirmacionImportacion();
+    pintarAviso(resultado.error);
+    return;
+  }
+
+  importacionPendiente = resultado.clientes;
+  textoConfirmacionImportar.textContent =
+    fraseConfirmacionImportacion(clientes.length, resultado.clientes.length);
+  panelConfirmacionImportar.hidden = false;
+}
+
+// Pregunta con contadores, en singular o plural según toque
+function fraseConfirmacionImportacion(actuales, entrantes) {
+  const actual = actuales === 1 ? "1 cliente actual" : actuales + " clientes actuales";
+  const entrante = entrantes === 1 ? "1 cliente del archivo" : entrantes + " clientes del archivo";
+  return "¿Reemplazar " + actual + " por " + entrante + "?";
+}
+
+function ocultarConfirmacionImportacion() {
+  panelConfirmacionImportar.hidden = true;
+}
+
+// «Sí, reemplazar»: la lista nueva se guarda y todo vuelve a un estado limpio
+botonReemplazar.addEventListener("click", function () {
+  if (importacionPendiente === null) return;
+
+  clientes = importacionPendiente;
+  importacionPendiente = null;
+  guardarClientes();
+
+  // Estado limpio (RF-901): pestaña «Todos» y buscador vacío, campo e interno
+  filtroActivo = "Todos";
+  textoBusqueda = "";
+  campoBuscador.value = "";
+
+  // Y sin ediciones ni borrados en curso apuntando a clientes que ya no existen
+  confirmandoEliminarId = null;
+  if (clienteEditandoId !== null) {
+    clienteEditandoId = null;
+    resetearFormulario();
+    pintarFormularioModo();
+  }
+
+  pintarFiltros();
+  ocultarConfirmacionImportacion();
+  pintarLista();
+  pintarAviso("Clientes importados");
+});
+
+// «Cancelar»: se descarta el fichero y no cambia nada
+botonCancelarImportacion.addEventListener("click", function () {
+  importacionPendiente = null;
+  ocultarConfirmacionImportacion();
+});
+
+// =====================================================
 // Lista de clientes
 // =====================================================
 
@@ -304,6 +473,13 @@ function pintarLista() {
         "». Prueba con otras palabras o con la pestaña «Todos».";
     } else if (filtroActivo === "Todos") {
       mensaje = "Aún no hay clientes. Rellena el formulario de arriba para añadir el primero.";
+      // Migración en 2 clics (spec 011, RF-903): solo en escritorio y solo si al
+      // arrancar NO existía el archivo (sin clientes y sin búsqueda/filtro, que es
+      // este mismo caso). Es un aviso más: no bloquea dar de alta clientes nuevos.
+      if (EN_ESCRITORIO && !archivoInicialExiste && clientes.length === 0) {
+        // Frase fija (sin datos del usuario), pero la pasamos por escapar por costumbre
+        mensaje += " " + escapar("¿Vienes de la web? Exporta la copia allí e impórtala aquí con «Importar».");
+      }
     } else {
       mensaje = "No hay clientes de tipo " + escapar(nombreTipo(filtroActivo)) +
         ". Prueba con la pestaña «Todos».";

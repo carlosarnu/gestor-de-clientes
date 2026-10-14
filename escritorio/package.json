@@ -1,0 +1,55 @@
+{
+  "name": "gestor-de-clientes",
+  "productName": "Gestor de Clientes",
+  "version": "1.0.0",
+  "description": "App de escritorio del Gestor de Clientes (spec 011)",
+  "main": "main.js",
+  "author": "Gestor de Clientes",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "44.7.2",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "com.gestordeclientes.escritorio",
+    "productName": "Gestor de Clientes",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js"
+    ],
+    "extraResources": [
+      {
+        "from": "../index.html",
+        "to": "index.html"
+      },
+      {
+        "from": "../styles.css",
+        "to": "styles.css"
+      },
+      {
+        "from": "../app.js",
+        "to": "app.js"
+      },
+      {
+        "from": "../logica.js",
+        "to": "logica.js"
+      }
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Gestor de Clientes"
+    }
+  }
+}

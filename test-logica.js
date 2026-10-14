@@ -26,7 +26,9 @@ const {
   normalizar,
   buscarClientes,
   esTipoFijo,
-  migrarTipos
+  migrarTipos,
+  nombreArchivoExportacion,
+  importarClientes
 } = require("./logica.js");
 
 // Ayuda: un formulario falso con la interfaz de FormData (.get)
@@ -341,4 +343,68 @@ test("migrarTipos con nada que migrar devuelve la MISMA lista (idempotente, RF-7
   assert.equal(migrarTipos(lista), lista);
   const vacia = [];
   assert.equal(migrarTipos(vacia), vacia);
+});
+
+// ===== exportación e importación (spec 011) =====
+
+test("nombreArchivoExportacion usa la fecha LOCAL con ceros (RF-905)", () => {
+  assert.equal(nombreArchivoExportacion(new Date(2026, 0, 5)), "clientes-2026-01-05.json");
+  assert.equal(nombreArchivoExportacion(new Date(2026, 11, 31)), "clientes-2026-12-31.json");
+  // Pasada la medianoche local el día es el LOCAL (con UTC se adelantaría al día anterior)
+  assert.equal(nombreArchivoExportacion(new Date(2026, 0, 1, 0, 30)), "clientes-2026-01-01.json");
+});
+
+test("importarClientes con JSON inválido da error y clientes null (RF-905)", () => {
+  const resultado = importarClientes("esto no es json {{{");
+  assert.equal(resultado.clientes, null);
+  assert.equal(resultado.error, "El archivo no tiene un formato JSON válido");
+  // cadena vacía: tampoco es JSON
+  assert.equal(importarClientes("").error, "El archivo no tiene un formato JSON válido");
+});
+
+test("importarClientes con JSON que no es lista da error (RF-905)", () => {
+  const resultado = importarClientes('{"empresa": "Textiles Norte"}');
+  assert.equal(resultado.clientes, null);
+  assert.equal(resultado.error, "El archivo no contiene una lista de clientes");
+});
+
+test("importarClientes normaliza los campos que faltan y descarta lo que no sea objeto (RF-905)", () => {
+  const resultado = importarClientes(JSON.stringify([
+    { empresa: "  Muebles Rápido  ", telefono: " 611 " },
+    "basura",
+    null,
+    { id: "abc", fecha: "ayer", cif: 12345 }
+  ]));
+  assert.equal(resultado.error, null);
+  assert.equal(resultado.clientes.length, 2); // la basura se ignora
+  const cliente = resultado.clientes[0];
+  assert.deepEqual(Object.keys(cliente), ["id", "fecha", "empresa", "cif", "contacto", "telefono", "movil", "email", "direccion", "codigoPostal", "tipo", "notas"]);
+  assert.equal(cliente.empresa, "Muebles Rápido"); // espacios recortados
+  assert.equal(cliente.telefono, "611");
+  assert.equal(cliente.cif, ""); // lo que falta, vacío
+  assert.equal(cliente.movil, "");
+  assert.equal(cliente.notas, "");
+  assert.equal(typeof cliente.id, "number");
+  assert.equal(typeof cliente.fecha, "number");
+  const tambien = resultado.clientes[1];
+  assert.equal(typeof tambien.id, "number"); // id/fecha no numéricos se asignan
+  assert.equal(typeof tambien.fecha, "number");
+  assert.ok(Number.isFinite(tambien.id));
+  assert.equal(tambien.cif, "12345"); // texto() convierte a cadena
+});
+
+test("importarClientes migra «FOAM» a «Espuma» y conserva id y fecha válidos (RF-905)", () => {
+  const resultado = importarClientes(JSON.stringify([
+    { id: 10, fecha: 1700000000000, empresa: "Asientos Vega", cif: "", contacto: "", telefono: "633", movil: "", email: "", direccion: "", codigoPostal: "", tipo: "FOAM", notas: "se conserva" }
+  ]));
+  assert.equal(resultado.error, null);
+  assert.equal(resultado.clientes[0].tipo, "Espuma");
+  assert.equal(resultado.clientes[0].notas, "se conserva");
+  assert.equal(resultado.clientes[0].id, 10);
+  assert.equal(resultado.clientes[0].fecha, 1700000000000);
+});
+
+test("importarClientes con lista vacía devuelve lista vacía sin error (RF-905)", () => {
+  const resultado = importarClientes("[]");
+  assert.deepEqual(resultado, { clientes: [], error: null });
 });

@@ -114,6 +114,20 @@
         <button type="button" class="filtro" data-filtro="Otros">Otros</button>
       </div>
 
+      <!-- Copia de seguridad (spec 011, RF-901): exportar e importar -->
+      <div class="copia-seguridad">
+        <button type="button" class="boton-secundario" id="boton-exportar">Exportar</button>
+        <button type="button" class="boton-secundario" id="boton-importar">Importar</button>
+        <input type="file" id="archivo-importar" accept=".json,application/json" hidden>
+      </div>
+
+      <!-- Confirmación EN LÍNEA de la importación (estilo «¿Seguro?», nunca confirm()/alert()) -->
+      <div class="confirmacion-importacion" id="confirmacion-importacion" hidden>
+        <p class="confirmacion-importacion-texto" id="confirmacion-importacion-texto"></p>
+        <button type="button" class="boton-secundario boton-reemplazar" id="boton-reemplazar">Sí, reemplazar</button>
+        <button type="button" class="boton-secundario" id="boton-cancelar-importacion">Cancelar</button>
+      </div>
+
       <div class="lista-clientes" id="lista-clientes"></div>
     </section>
 

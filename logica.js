@@ -197,6 +197,74 @@ function buscarClientes(lista, consulta) {
   });
 }
 
+// =====================================================
+// Exportar e importar copias de seguridad (spec 011)
+// =====================================================
+
+// Rellena con un cero a la izquierda si hace falta (mes y día)
+function dosDigitos(numero) {
+  return numero < 10 ? "0" + numero : "" + numero;
+}
+
+// Nombre del fichero de exportación: "clientes-AAAA-MM-DD.json".
+// Usa la fecha LOCAL (getMonth/getDate), nunca la de ISO/UTC (toISOString
+// adelantaría o retrasaría el día según la zona horaria).
+function nombreArchivoExportacion(fecha) {
+  return (
+    "clientes-" +
+    fecha.getFullYear() +
+    "-" + dosDigitos(fecha.getMonth() + 1) +
+    "-" + dosDigitos(fecha.getDate()) +
+    ".json"
+  );
+}
+
+// ¿Es un número de verdad (no NaN ni Infinity)? Para conservar id y fecha importados
+function esNumero(valor) {
+  return typeof valor === "number" && isFinite(valor);
+}
+
+// Valida y normaliza el JSON de una importación (RF-905).
+// Devuelve SIEMPRE { clientes, error }: la lista lista para usar (error null) o
+// null con un mensaje de error en español, para que quien importa no toque los
+// datos actuales si el fichero es basura.
+function importarClientes(textoJson) {
+  let datos;
+  try {
+    datos = JSON.parse(textoJson);
+  } catch (e) {
+    return { clientes: null, error: "El archivo no tiene un formato JSON válido" };
+  }
+
+  if (!Array.isArray(datos)) {
+    return { clientes: null, error: "El archivo no contiene una lista de clientes" };
+  }
+
+  const clientes = [];
+  datos.forEach(function (elemento, indice) {
+    // Solo los objetos son clientes posibles; el resto (nulos, textos, números,
+    // arrays) se ignora sin romper la importación
+    if (elemento === null || typeof elemento !== "object" || Array.isArray(elemento)) return;
+    clientes.push({
+      id: esNumero(elemento.id) ? elemento.id : Date.now() + indice,
+      fecha: esNumero(elemento.fecha) ? elemento.fecha : Date.now(),
+      empresa: texto(elemento.empresa),
+      cif: texto(elemento.cif),
+      contacto: texto(elemento.contacto),
+      telefono: texto(elemento.telefono),
+      movil: texto(elemento.movil),
+      email: texto(elemento.email),
+      direccion: texto(elemento.direccion),
+      codigoPostal: texto(elemento.codigoPostal),
+      tipo: texto(elemento.tipo),
+      notas: texto(elemento.notas)
+    });
+  });
+
+  // Por si el fichero viene de datos antiguos con «FOAM» (spec 009)
+  return { clientes: migrarTipos(clientes), error: null };
+}
+
 // En Node (tests) exportamos las funciones; en el navegador no existe `module` y se omite.
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
@@ -220,6 +288,8 @@ if (typeof module !== "undefined" && module.exports) {
     normalizar,
     buscarClientes,
     esTipoFijo,
-    migrarTipos
+    migrarTipos,
+    nombreArchivoExportacion,
+    importarClientes
   };
 }

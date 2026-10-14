@@ -4,7 +4,7 @@ Principios innegociables del proyecto. Toda especificación, plan y tarea debe c
 
 1. **Simplicidad y Portabilidad absoluta**: HTML5, CSS3 y JavaScript nativos. Sin frameworks, sin
 librerías externas de terceros y sin herramientas de compilación (*bundlers*). La aplicación debe
-funcionar perfectamente abriendo `index.html` con un doble clic en cualquier navegador.
+funcionar perfectamente abriendo `index.html` con un doble clic en cualquier navegador. **Excepcion aprobada (spec 011, 2026-10-14)**: el embudo de escritorio de la carpeta `escritorio/` (Electron + electron-builder) se permite unicamente como empaquetado de la misma web; el codigo de la aplicacion sigue siendo JS puro, sin frameworks ni dependencias.
 2. **La especificación manda**: Ninguna funcionalidad o cambio de código se implementa si no está
 previamente detallado en su archivo `spec.md` aprobado. Ante cualquier duda o ambigüedad, se debe
 pausar y consultar.

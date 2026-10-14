@@ -4,3 +4,7 @@
 # Sistema
 Thumbs.db
 .DS_Store
+
+# App de escritorio (spec 011)
+escritorio/node_modules/
+escritorio/dist/

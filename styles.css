@@ -291,6 +291,64 @@ h2 {
   color: var(--tinta-suave);
 }
 
+/* ===== Copia de seguridad (spec 011, RF-901) ===== */
+
+.copia-seguridad {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+/* En móvil cada botón ocupa su fila (apilados, sin desbordes); en pantalla
+   ancha se ponen en fila */
+.copia-seguridad .boton-secundario {
+  flex: 1 1 100%;
+  min-height: 44px; /* objetivo táctil */
+}
+
+/* Confirmación en línea de la importación (mismo aire que el «¿Seguro?» de
+   las tarjetas, pero como panel sobre la lista) */
+.confirmacion-importacion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--peligro-linea);
+  border-radius: var(--radio);
+  background: var(--superficie);
+}
+
+/* El atributo hidden debe ganar al display:flex del panel */
+.confirmacion-importacion[hidden] {
+  display: none;
+}
+
+.confirmacion-importacion-texto {
+  flex: 1 1 240px;
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--peligro);
+}
+
+.confirmacion-importacion .boton-secundario {
+  flex: 1 1 100%;
+  min-height: 44px;
+}
+
+.boton-reemplazar {
+  background: var(--peligro);
+  border-color: var(--peligro);
+  color: #ffffff;
+}
+
+.boton-reemplazar:hover {
+  background: #7f2424;
+}
+
 /* ===== Lista de clientes ===== */
 
 .lista-clientes {
@@ -559,6 +617,13 @@ h2 {
   }
 
   .boton-principal {
+    width: auto;
+  }
+
+  /* Copia de seguridad: de apilados (móvil) a en fila (escritorio) */
+  .copia-seguridad .boton-secundario,
+  .confirmacion-importacion .boton-secundario {
+    flex: 0 1 auto;
     width: auto;
   }
 
