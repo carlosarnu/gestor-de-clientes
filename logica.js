@@ -24,6 +24,10 @@ function escaparAtributo(valor) {
     .replace(/'/g, "&#39;");
 }
 
+// Los tres tipos fijos del formulario (spec 008): única fuente desde la 014, de la
+// que penden esTipoFijo, los filtros y los chips del formulario
+const TIPOS_FIJOS = ["Tela", "Espuma", "Estructuras"];
+
 // "Tela" -> "tela", "Espuma" -> "espuma", "Estructuras" -> "estructuras";
 // cualquier tipo escrito («Otros», spec 008) -> "otros"; sin tipo -> ""
 function claseTipo(tipo) {
@@ -32,9 +36,50 @@ function claseTipo(tipo) {
   return esTipoFijo(valor) ? valor.toLowerCase() : "otros";
 }
 
-// ¿Es uno de los tres tipos fijos del desplegable? (spec 008)
+// ¿Es uno de los tres tipos fijos? (spec 008; comparación exacta tras recortar)
 function esTipoFijo(tipo) {
-  return ["Tela", "Espuma", "Estructuras"].indexOf(texto(tipo)) !== -1;
+  return TIPOS_FIJOS.indexOf(texto(tipo)) !== -1;
+}
+
+// =====================================================
+// Tipos múltiples de cliente (spec 014)
+// =====================================================
+
+// Array normalizado de tipos (RF-1202): si el valor no es array → []; cada elemento
+// se convierte a texto, se recorta y se quitan vacíos y duplicados EXACTOS («tela»
+// minúscula NO se unifica con «Tela», Decisión 11), conservando el orden y SIN
+// truncar (el límite de 40 caracteres es solo del formulario, RF-1203).
+// No aplica FOAM: eso vive solo en la migración (Decisión 4 del plan).
+function normalizarTipos(valor) {
+  if (!Array.isArray(valor)) return [];
+  return valor.reduce(function (salida, elemento) {
+    const limpio = texto(elemento);
+    if (limpio !== "" && salida.indexOf(limpio) === -1) salida.push(limpio);
+    return salida;
+  }, []);
+}
+
+// FOAM → Espuma (spec 009) dentro de una lista de tipos, volviendo a quitar
+// duplicados por si conviven «FOAM» y «Espuma»: así la migración es idempotente
+function migrarFoamEnTipos(tipos) {
+  return normalizarTipos(tipos.map(function (tipo) {
+    return tipo === "FOAM" ? "Espuma" : tipo;
+  }));
+}
+
+// Única puerta de lectura de los tipos efectivos de un cliente (RF-1201/RF-1202,
+// Decisión 12): SI `tipos` es array con elementos tras normalizar → son esos
+// (FOAM migrado) y `tipo` se ignora por completo; si `tipos` está ausente, no es
+// array o acaba vacío → se reconstruye desde `tipo` (opción protectora del dato).
+// Devuelve SIEMPRE un array normalizado, sin mutar al cliente.
+function tiposCliente(cliente) {
+  const fuente = cliente || {};
+  if (Array.isArray(fuente.tipos)) {
+    const propios = migrarFoamEnTipos(normalizarTipos(fuente.tipos));
+    if (propios.length > 0) return propios;
+  }
+  const legado = texto(fuente.tipo);
+  return migrarFoamEnTipos(legado === "" ? [] : [legado]);
 }
 
 // Devuelve el cliente con ese id dentro de la lista, o undefined
@@ -44,10 +89,23 @@ function buscarCliente(lista, id) {
   });
 }
 
-// Rellena los 12 campos de un cliente a partir del formulario.
+// Tipos a guardar en un alta/edición (RF-1204): los chips elegidos en el formulario
+// (parámetro `tipos`, ya un array) normalizados, o — formato legado, sin parámetro —
+// derivados del string del campo «tipo» ([tipo] o []). Así la firma antigua sigue
+// funcionando (compatibilidad, Decisión 3 del plan).
+function tiposSeleccionados(tipos, datos) {
+  if (Array.isArray(tipos)) return normalizarTipos(tipos);
+  const legado = texto(datos.get("tipo"));
+  return legado === "" ? [] : [legado];
+}
+
+// Rellena los 13 campos de un cliente a partir del formulario: los 12 de siempre
+// más `tipos` (array canónico) junto a `tipo` (= tipos[0] ?? "", solo lectura
+// para versiones antiguas, RF-1201).
 // Conserva id y fecha de `actual` (los pone él mismo).
 // Todos los datos son opcionales (spec 007): lo que no venga, queda en "".
-function actualizarCliente(actual, datos) {
+function actualizarCliente(actual, datos, tipos) {
+  const listaTipos = tiposSeleccionados(tipos, datos);
   return {
     id: actual.id,
     fecha: actual.fecha,
@@ -59,21 +117,23 @@ function actualizarCliente(actual, datos) {
     email: texto(datos.get("email")),
     direccion: texto(datos.get("direccion")),
     codigoPostal: texto(datos.get("codigoPostal")),
-    tipo: texto(datos.get("tipo")),
+    tipos: listaTipos,
+    tipo: listaTipos.length > 0 ? listaTipos[0] : "",
     notas: texto(datos.get("notas"))
   };
 }
 
-// Cliente nuevo de alta: recibe id y fecha desde fuera (fácil de testear)
-function construirCliente(datos, id, fecha) {
-  return actualizarCliente({ id: id, fecha: fecha }, datos);
+// Cliente nuevo de alta: recibe id y fecha desde fuera (fácil de testear);
+// `tipos` (opcional) es la lista de chips elegida en el formulario
+function construirCliente(datos, id, fecha, tipos) {
+  return actualizarCliente({ id: id, fecha: fecha }, datos, tipos);
 }
 
 // Devuelve la lista con el cliente editado (mismo id y fecha, sin duplicar nada)
-function aplicarEdicion(lista, id, datos) {
+function aplicarEdicion(lista, id, datos, tipos) {
   return lista.map(function (cliente) {
     if (cliente.id !== id) return cliente;
-    return actualizarCliente(cliente, datos);
+    return actualizarCliente(cliente, datos, tipos);
   });
 }
 
@@ -85,34 +145,91 @@ function eliminarClienteDe(lista, id) {
 }
 
 // =====================================================
-// Migración de datos antiguos (spec 009)
+// Migración de datos antiguos (specs 009 y 014)
 // =====================================================
 
-// Hasta la spec 009 el tipo «Espuma» se guardaba como «FOAM»: al cargar, esos clientes
-// pasan a «Espuma» conservando intactos el resto de campos (los datos son sagrados,
-// regla 3 de la constitución). Devuelve la MISMA lista si no hay nada que migrar.
+// ¿Los tipos ya guardados coinciden exactamente con los efectivos?
+function tiposIguales(guardados, efectivos) {
+  return Array.isArray(guardados) &&
+    guardados.length === efectivos.length &&
+    guardados.every(function (tipo, i) { return tipo === efectivos[i]; });
+}
+
+// Migración de datos antiguos al esquema con `tipos` múltiples (RF-1202): por cada
+// cliente escribe `tipos` = tiposCliente(cliente) y `tipo` = `tipos[0] ?? ""`,
+// conservando intactos el resto de campos (los datos son sagrados, regla 3 de la
+// constitución). Cubre TODO el RF-1202: FOAM → Espuma dentro de cada tipo, string
+// → array, normalización (recorte, vacíos y duplicados exactos fuera, sin truncar)
+// y reconstrucción desde `tipo` cuando `tipos` está ausente, no es array o acaba
+// vacío (Decisión 12). Devuelve la MISMA lista si no hay nada que migrar, así que
+// la escritura (localStorage / clientes.json) solo ocurre si algo cambió.
+// Es idempotente: aplicarla dos veces deja exactamente el mismo resultado.
 function migrarTipos(lista) {
   let huboCambio = false;
   const migrada = lista.map(function (cliente) {
-    if (texto(cliente.tipo) !== "FOAM") return cliente;
+    const tipos = tiposCliente(cliente);
+    const tipo = tipos.length > 0 ? tipos[0] : "";
+    // Solo se reescribe el cliente si `tipos` o `tipo` difieren del resultado
+    if (cliente.tipo === tipo && tiposIguales(cliente.tipos, tipos)) return cliente;
     huboCambio = true;
-    return Object.assign({}, cliente, { tipo: "Espuma" });
+    return Object.assign({}, cliente, { tipos: tipos, tipo: tipo });
   });
   return huboCambio ? migrada : lista;
 }
 
-// Filtro de pestañas: "Todos", un tipo concreto o "Otros" (lo que no sea de los tres
-// fijos y tenga tipo escrito, RF-603; los «Sin tipo» solo en "Todos").
+// =====================================================
+// Chips del formulario de tipos (spec 014)
+// =====================================================
+
+// Lista NUEVA con el chip fijo alternado (RF-1203): si estaba marcado, se quita;
+// si no, se añade AL FINAL del orden de selección (Decisión 5). No muta la entrada.
+function alternarTipoFijo(tipos, tipo) {
+  const lista = normalizarTipos(tipos);
+  const valor = texto(tipo);
+  if (valor === "") return lista;
+  return lista.indexOf(valor) !== -1
+    ? lista.filter(function (t) { return t !== valor; })
+    : lista.concat([valor]);
+}
+
+// Lista NUEVA tras añadir el texto escrito como chip (RF-1203): se recorta; vacío
+// o solo espacios → sin cambios (sin «Otros» automático, Decisión 4); si ya estaba
+// (fijo marcado o libre añadido) → sin duplicado; si tras recortar coincide EXACTA
+// con un tipo fijo, se comporta fijo (coincidencia exacta, mayúsculas incluidas).
+// No trunca: los 40 caracteres son solo del formulario (Decisión 5).
+function añadirTipoLibre(tipos, escrito) {
+  const lista = normalizarTipos(tipos);
+  const valor = texto(escrito);
+  if (valor === "" || lista.indexOf(valor) !== -1) return lista;
+  return lista.concat([valor]);
+}
+
+// Lista NUEVA sin ese texto exacto (el «×» del chip libre, RF-1203); si no
+// estaba, sin cambios. No muta la entrada.
+function quitarTipoLibre(tipos, tipo) {
+  const lista = normalizarTipos(tipos);
+  const valor = texto(tipo);
+  return lista.filter(function (t) { return t !== valor; });
+}
+
+// Filtro de pestañas por PERTENENCIA (RF-1205): "Todos" → toda la lista; un tipo
+// concreto → los clientes que lo tengan entre sus tipos efectivos («Tela» incluye
+// a ["Tela","Espuma"]); "Otros" → quien tenga algún tipo no fijo (los fijos junto
+// a libres también entran, Decisión 7). Los «Sin tipos» solo en "Todos".
+// Funciona igual con datos viejos (solo `tipo`) gracias a tiposCliente.
 // No modifica la lista original.
 function filtrarClientes(lista, filtro) {
   if (filtro === "Todos") return lista.slice();
   if (filtro === "Otros") {
     return lista.filter(function (cliente) {
-      return texto(cliente.tipo) !== "" && !esTipoFijo(cliente.tipo);
+      return tiposCliente(cliente).some(function (tipo) {
+        return !esTipoFijo(tipo);
+      });
     });
   }
+  const buscado = texto(filtro);
   return lista.filter(function (cliente) {
-    return cliente.tipo === filtro;
+    return tiposCliente(cliente).indexOf(buscado) !== -1;
   });
 }
 
@@ -187,12 +304,16 @@ function normalizar(valor) {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
-// Texto completo de un cliente para buscar en él (incluye tipo en español y tal cual)
+// Texto completo de un cliente para buscar en él: TODOS sus tipos efectivos
+// unidos (RF-1206: «tela toldos» se reparte entre tipos del mismo cliente) y, si
+// no tiene tipos, la convención de la 005 de buscar también en «Sin tipo»
 function textoBusquedaCliente(cliente) {
+  const tipos = tiposCliente(cliente);
+  const textoTipos = tipos.length > 0 ? tipos.join(" ") : nombreTipo("");
   return normalizar([
     cliente.empresa, cliente.cif, cliente.contacto, cliente.telefono,
     cliente.movil, cliente.email, cliente.direccion, cliente.codigoPostal,
-    cliente.notas, cliente.tipo, nombreTipo(cliente.tipo)
+    cliente.notas, textoTipos
   ].join(" "));
 }
 
@@ -271,12 +392,15 @@ function importarClientes(textoJson) {
       email: texto(elemento.email),
       direccion: texto(elemento.direccion),
       codigoPostal: texto(elemento.codigoPostal),
+      // `tipos` se copia TAL CUAL (cualquier valor JSON) y la normalización,
+      // la migración FOAM y la reescritura de `tipo` las hace migrarTipos abajo
+      tipos: elemento.tipos,
       tipo: texto(elemento.tipo),
       notas: texto(elemento.notas)
     });
   });
 
-  // Por si el fichero viene de datos antiguos con «FOAM» (spec 009)
+  // Ficheros antiguos (solo `tipo`) y nuevos (con `tipos`): RF-1202 y RF-1209
   return { clientes: migrarTipos(clientes), error: null };
 }
 
@@ -348,11 +472,20 @@ function fechaTextoLocal(fecha, hoy) {
   );
 }
 
+// Texto plano de la celda «Tipo» del listado y del papel (RF-1208, Decisión 8):
+// todos los tipos unidos con « + » (p. ej. «Tela + Espuma») o «Sin tipo» si no
+// hay ninguno. Sin HTML (la 012/013 exigen texto puro).
+function unirTiposTexto(tipos) {
+  const lista = normalizarTipos(tipos);
+  return lista.length === 0 ? "Sin tipo" : lista.join(" + ");
+}
+
 // Datos de las celdas de un cliente para las columnas elegidas: [{ clave, etiqueta,
 // valor }], solo datos y sin HTML (el escapado y el título emergente los pinta
 // app.js, RF-1005). Convenciones de la Decisión 6: empresa vacía → «Sin nombre»,
-// tipo → nombreTipo («Sin tipo» o el texto libre de la 008), fecha → dd/mm/aaaa
-// local y el resto de celdas → «—»; ninguna celda queda en blanco.
+// tipos → unirTiposTexto de los tipos efectivos («Sin tipo», «Tela + Espuma»…,
+// RF-1208), fecha → dd/mm/aaaa local y el resto de celdas → «—»; ninguna celda
+// queda en blanco.
 function construirCeldas(cliente, campos, hoy) {
   return normalizarSeleccion(campos).map(function (clave) {
     const campo = CATALOGO_CAMPOS.find(function (c) {
@@ -360,7 +493,7 @@ function construirCeldas(cliente, campos, hoy) {
     });
     let valor;
     if (clave === "empresa") valor = texto(cliente.empresa) || "Sin nombre";
-    else if (clave === "tipo") valor = nombreTipo(cliente.tipo);
+    else if (clave === "tipo") valor = unirTiposTexto(tiposCliente(cliente));
     else if (clave === "fecha") valor = fechaTextoLocal(cliente.fecha, hoy) || "—";
     else valor = texto(cliente[clave]) || "—";
     return { clave: campo.clave, etiqueta: campo.etiqueta, valor: valor };
@@ -426,6 +559,13 @@ if (typeof module !== "undefined" && module.exports) {
     importarClientes,
     dosDigitos,
     escaparAtributo,
+    TIPOS_FIJOS,
+    normalizarTipos,
+    tiposCliente,
+    alternarTipoFijo,
+    añadirTipoLibre,
+    quitarTipoLibre,
+    unirTiposTexto,
     CATALOGO_CAMPOS,
     normalizarSeleccion,
     alternarCampo,

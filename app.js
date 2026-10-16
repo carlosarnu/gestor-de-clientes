@@ -53,6 +53,10 @@ let textoBusqueda = ""; // texto del buscador (spec 005)
 // persistencia — al recargar se vuelve a «Tarjetas» con solo «Empresa» (RF-1006)
 let vistaActual = "tarjetas"; // "tarjetas" (por defecto) o "listado"
 let camposSeleccionados = normalizarSeleccion(["empresa"]); // 1 campo por defecto
+// Tipos elegidos en el formulario (spec 014, RF-1203/RF-1210): SOLO en memoria,
+// sin persistencia (ninguna clave nueva): se vacía al resetear el formulario y se
+// carga con los tipos del cliente al entrar en edición
+let tiposFormulario = [];
 let clienteEditandoId = null; // id del cliente en edición, o null si no se está editando
 let confirmandoEliminarId = null; // id de la tarjeta mostrando "¿Seguro?", o null si no hay ninguna
 let importacionPendiente = null; // clientes del fichero esperando confirmación, o null
@@ -130,36 +134,107 @@ function guardarClientes() {
 // Formulario
 // =====================================================
 
-// Campo «Escribe el tipo»: solo existe con la opción «Otros» (spec 008, RF-602)
-const campoTipoOtro = document.getElementById("campo-tipo-otro");
-const tipoOtro = document.getElementById("tipo-otro");
+// --- Chips de tipos del formulario (spec 014, RF-1203/RF-1204) ---
+// Los tres chips fijos se generan desde TIPOS_FIJOS (fuente única de la que
+// cuelga esTipoFijo, plan §3/D-8) y los tipos propios del usuario se pintan
+// como chips libres con su «×». La selección vive en `tiposFormulario` (solo
+// en memoria, RF-1210); la 008 (desplegable y campo «Otros») ya no existe.
+const contenedorChipsTipos = document.getElementById("chips-tipos");
+const campoTipoOtro = document.getElementById("tipo-otro");
+const botonAnadirTipo = document.getElementById("boton-anadir-tipo");
 
-function sincronizarTipoOtro() {
-  const esOtros = formulario.tipo.value === "Otros";
-  campoTipoOtro.hidden = !esOtros;
-  if (!esOtros) tipoOtro.value = "";
+// Repinta los chips del formulario: fijos con su casilla (aria-checked + «✔/□»,
+// estado visible sin depender solo del color) y libres con su botón «×»
+function pintarChipsTipos() {
+  const fijos = TIPOS_FIJOS.map(function (tipo) {
+    const marcado = tiposFormulario.indexOf(tipo) !== -1;
+    return '<button type="button" class="chip' + (marcado ? " marcado" : "") +
+      '" role="checkbox" aria-checked="' + (marcado ? "true" : "false") +
+      '" data-tipo="' + escaparAtributo(tipo) + '">' +
+      '<span class="chip-marca" aria-hidden="true">' + (marcado ? "✔" : "□") + "</span>" +
+      escapar(tipo) +
+      "</button>";
+  });
+
+  // Libres = los tipos elegidos que no son fijos, en orden de adición;
+  // el texto del «×» lleva aria-label en español (regla 5)
+  const libres = tiposFormulario
+    .filter(function (tipo) { return !esTipoFijo(tipo); })
+    .map(function (tipo) {
+      return '<span class="chip chip-libre" data-tipo-libre="' + escaparAtributo(tipo) + '">' +
+        escapar(tipo) +
+        '<button type="button" class="chip-quitar" data-tipo="' + escaparAtributo(tipo) +
+        '" aria-label="Quitar tipo ' + escaparAtributo(tipo) + '">×</button>' +
+        "</span>";
+    });
+
+  contenedorChipsTipos.innerHTML = fijos.concat(libres).join("");
 }
 
-// Reset del formulario que también oculta el tipo personalizado
-function resetearFormulario() {
-  formulario.reset();
-  sincronizarTipoOtro();
+// «Añadir otro tipo» (botón o Intro): el texto recortado pasa a chip — si
+// coincide exactamente con un fijo se marca él, y si ya estaba no se duplica
+// (las reglas viven en añadirTipoLibre); vacío o solo espacios no añade nada
+function anadirTipoDelCampo() {
+  tiposFormulario = añadirTipoLibre(tiposFormulario, campoTipoOtro.value);
+  campoTipoOtro.value = "";
+  pintarChipsTipos();
+  campoTipoOtro.focus(); // se puede seguir añadiendo sin salir del campo
 }
 
-formulario.tipo.addEventListener("change", sincronizarTipoOtro);
-
-// Carga el tipo del cliente en el desplegable (los tipos escritos a mano
-// vuelven como «Otros» con su texto, RF-605)
-function cargarTipoEnFormulario(tipo) {
-  const valor = texto(tipo);
-  if (valor !== "" && !esTipoFijo(valor)) {
-    formulario.tipo.value = "Otros";
-    tipoOtro.value = valor === "Otros" ? "" : valor;
-  } else {
-    formulario.tipo.value = valor; // uno de los tres fijos o el hueco vacío
-    tipoOtro.value = "";
+// Clic dentro de los chips: «×» de un chip libre, o alternar un tipo fijo
+contenedorChipsTipos.addEventListener("click", function (evento) {
+  const quitar = evento.target.closest(".chip-quitar");
+  if (quitar) {
+    quitarTipoDelFormulario(quitar.dataset.tipo);
+    return;
   }
-  sincronizarTipoOtro();
+
+  const chip = evento.target.closest(".chip[data-tipo]");
+  if (!chip) return;
+
+  tiposFormulario = alternarTipoFijo(tiposFormulario, chip.dataset.tipo);
+  pintarChipsTipos();
+
+  // pintarChipsTipos() reconstruye los botones: devolvemos el foco al mismo chip
+  // para que Intro/Espacio seguidos sigan alternándolo (mismo patrón que los
+  // chips del listado de la 012)
+  const repintado = contenedorChipsTipos.querySelector('.chip[data-tipo="' + chip.dataset.tipo + '"]');
+  if (repintado) repintado.focus();
+});
+
+// Quita un tipo libre y ubica el foco en el siguiente chip libre (o en el
+// anterior si era el último): el quitado ya no existe y el foco no debe caer
+// al body; sin libres restantes, vuelve al campo «Añadir otro tipo»
+function quitarTipoDelFormulario(tipo) {
+  const libres = tiposFormulario.filter(function (t) { return !esTipoFijo(t); });
+  const posicion = Math.max(libres.indexOf(tipo), 0);
+
+  tiposFormulario = quitarTipoLibre(tiposFormulario, tipo);
+  pintarChipsTipos();
+
+  const restantes = contenedorChipsTipos.querySelectorAll(".chip-quitar");
+  if (restantes.length > 0) {
+    restantes[Math.min(posicion, restantes.length - 1)].focus();
+  } else {
+    campoTipoOtro.focus();
+  }
+}
+
+botonAnadirTipo.addEventListener("click", anadirTipoDelCampo);
+
+// Intro en el campo añade lo escrito; el preventDefault evita que el Enter
+// dispare el submit del formulario (el input está dentro del <form>)
+campoTipoOtro.addEventListener("keydown", function (evento) {
+  if (evento.key !== "Enter") return;
+  evento.preventDefault();
+  anadirTipoDelCampo();
+});
+
+// Reset del formulario: campos y tipos elegidos (nada obligatorio, spec 007)
+function resetearFormulario() {
+  formulario.reset(); // también vacía el campo «Añadir otro tipo»
+  tiposFormulario = [];
+  pintarChipsTipos();
 }
 
 formulario.addEventListener("submit", function (evento) {
@@ -173,18 +248,15 @@ formulario.addEventListener("submit", function (evento) {
 
   const datos = new FormData(formulario);
 
-  // «Otros»: el tipo es lo escrito a mano (o «Otros» si el hueco queda vacío) (RF-602)
-  if (datos.get("tipo") === "Otros") {
-    datos.set("tipo", texto(tipoOtro.value) || "Otros");
-  }
-
   // Si estamos en modo edición, guardamos los cambios y salimos
   if (clienteEditandoId !== null) {
     guardarEdicion(datos);
     return;
   }
 
-  clientes.push(construirCliente(datos, Date.now(), Date.now()));
+  // Alta con los chips elegidos (spec 014, RF-1204): la lógica normaliza y
+  // escribe `tipos` + `tipo` = tipos[0] ?? ""
+  clientes.push(construirCliente(datos, Date.now(), Date.now(), tiposFormulario));
   guardarClientes();
 
   // Alta con feedback (spec 010, RF-801): buscador limpio y aviso «Cliente guardado».
@@ -307,7 +379,10 @@ function iniciarEdicion(id) {
   formulario.email.value = cliente.email || "";
   formulario.direccion.value = cliente.direccion || "";
   formulario.codigoPostal.value = cliente.codigoPostal || "";
-  cargarTipoEnFormulario(cliente.tipo);
+  // Tipos del cliente en los chips: fijos marcados y libres con su «×»
+  // (copia nueva: el estado del formulario no debe mutar al cliente)
+  tiposFormulario = tiposCliente(cliente).slice();
+  pintarChipsTipos();
   formulario.notas.value = cliente.notas || "";
 
   pintarFormularioModo();
@@ -342,8 +417,9 @@ function guardarEdicion(datos) {
     return;
   }
 
-  // Actualizamos los 12 campos conservando id y fecha originales (ver logica.js)
-  clientes = aplicarEdicion(clientes, clienteEditandoId, datos);
+  // Actualizamos los campos conservando id y fecha originales (ver logica.js);
+  // los tipos vienen de los chips del formulario (tiposFormulario, RF-1204)
+  clientes = aplicarEdicion(clientes, clienteEditandoId, datos, tiposFormulario);
   guardarClientes();
 
   clienteEditandoId = null;
@@ -605,6 +681,18 @@ function crearTarjeta(cliente) {
   const editando = cliente.id === clienteEditandoId;
   const confirmando = cliente.id === confirmandoEliminarId;
 
+  // Tipos efectivos (RF-1207): un badge por cada tipo, cada uno con su color
+  // (fijos con su paleta por claseTipo, libres en violeta «otros»). Sin tipos se
+  // pinta la lista [""] y sale la etiqueta «Sin tipo» de siempre (mismo aspecto
+  // que hasta ahora). El texto va por escapar() (contexto de texto); no se pintan
+  // data-* ni title en los badges, así que no hace falta escaparAtributo.
+  const tipos = tiposCliente(cliente);
+  const etiquetas = (tipos.length > 0 ? tipos : [""]).map(function (tipo) {
+    return '<span class="etiqueta etiqueta-' + claseTipo(tipo) + '">' +
+      escapar(nombreTipo(tipo)) +
+      "</span>";
+  }).join("");
+
   // Pie de la tarjeta: botones normales o paso de confirmación (nunca a la vez)
   const pie = confirmando
     ? '<div class="confirmacion">¿Seguro?' +
@@ -617,12 +705,12 @@ function crearTarjeta(cliente) {
       "</div>";
 
   return (
-    '<article class="tarjeta tarjeta-' + claseTipo(cliente.tipo) + (editando ? " editando" : "") + '">' +
+    // El canto de la tarjeta es el del PRIMER tipo (Decisión 6 de la spec 014: el
+    // mismo que `tipo` ven los lectores antiguos); sin tipos, sin canto, como hoy
+    '<article class="tarjeta tarjeta-' + claseTipo(tipos[0]) + (editando ? " editando" : "") + '">' +
       '<div class="tarjeta-cabecera">' +
         '<h3 class="tarjeta-empresa">' + (escapar(cliente.empresa) || "Sin nombre") + "</h3>" +
-        '<span class="etiqueta etiqueta-' + claseTipo(cliente.tipo) + '">' +
-          escapar(nombreTipo(cliente.tipo)) +
-        "</span>" +
+        '<div class="etiquetas">' + etiquetas + "</div>" +
       "</div>" +
       '<dl class="datos-cliente">' +
         fila("CIF/NIF", cliente.cif) +
@@ -712,7 +800,8 @@ function crearTablaListado(visibles) {
     }).join("");
     // La marca de edición cubre la fila entera (RF-1003), como en la tarjeta
     const editando = filaDatos.id === clienteEditandoId;
-    return '<tr class="fila fila-' + claseTipo(visibles[indice].tipo) +
+    // Canto por el PRIMER tipo efectivo, igual que la tarjeta (Decisión 6, RF-1207)
+    return '<tr class="fila fila-' + claseTipo(tiposCliente(visibles[indice])[0]) +
       (editando ? " editando" : "") + '" data-id="' + filaDatos.id + '">' +
       celdas + accionesFila(filaDatos.id) + "</tr>";
   }).join("");
@@ -769,5 +858,6 @@ window.addEventListener("offline", pintarLista);
 
 pintarConmutador();
 pintarChips();
+pintarChipsTipos();
 pintarFiltros();
 pintarLista();

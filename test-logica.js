@@ -39,7 +39,14 @@ const {
   dosDigitos,
   importarClientes,
   escaparAtributo,
-  textoContextoImpresion
+  textoContextoImpresion,
+  TIPOS_FIJOS,
+  normalizarTipos,
+  tiposCliente,
+  alternarTipoFijo,
+  añadirTipoLibre,
+  quitarTipoLibre,
+  unirTiposTexto
 } = require("./logica.js");
 
 // Ayuda: un formulario falso con la interfaz de FormData (.get)
@@ -105,19 +112,21 @@ test("esTipoFijo solo reconoce Tela, Espuma y Estructuras (RF-601)", () => {
 
 // ===== alta (RF-011: formato de datos) =====
 
-test("construirCliente crea los 12 campos con id y fecha dados (RF-011, RF-502)", () => {
+test("construirCliente crea los 13 campos con id y fecha dados (RF-011, RF-502, RF-1201)", () => {
   const nuevo = construirCliente(
     formulario({ empresa: "  Muebles Rápido  ", cif: "A1", contacto: "", telefono: " 611 ", movil: "622333444", email: "", direccion: "Calle Luna 5", codigoPostal: "28002", tipo: "Espuma", notas: "nada" }),
     555,
     1760000000000
   );
-  assert.deepEqual(Object.keys(nuevo), ["id", "fecha", "empresa", "cif", "contacto", "telefono", "movil", "email", "direccion", "codigoPostal", "tipo", "notas"]);
+  assert.deepEqual(Object.keys(nuevo), ["id", "fecha", "empresa", "cif", "contacto", "telefono", "movil", "email", "direccion", "codigoPostal", "tipos", "tipo", "notas"]);
   assert.equal(nuevo.id, 555);
   assert.equal(nuevo.fecha, 1760000000000);
   assert.equal(nuevo.empresa, "Muebles Rápido");
   assert.equal(nuevo.telefono, "611");
   assert.equal(nuevo.movil, "622333444");
   assert.equal(nuevo.codigoPostal, "28002");
+  assert.deepEqual(nuevo.tipos, ["Espuma"]); // sin parámetro de tipos: derivado del legado
+  assert.equal(nuevo.tipo, "Espuma");
 });
 
 test("construirCliente con todo vacío guarda igual (nada es obligatorio, RF-501)", () => {
@@ -349,8 +358,9 @@ test("migrarTipos cambia el tipo antiguo «FOAM» a «Espuma» sin tocar nada m�
   assert.equal(lista[0].tipo, "FOAM"); // la lista original queda como estaba
 });
 
-test("migrarTipos con nada que migrar devuelve la MISMA lista (idempotente, RF-702)", () => {
-  const lista = [{ id: 1, fecha: 1, empresa: "", cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipo: "Espuma", notas: "" }];
+test("migrarTipos con nada que migrar devuelve la MISMA lista (idempotente, RF-702/RF-1202)", () => {
+  // cliente YA en el formato nuevo (con `tipos`): ni nueva lista ni reescritura
+  const lista = [{ id: 1, fecha: 1, empresa: "", cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipos: ["Espuma"], tipo: "Espuma", notas: "" }];
   assert.equal(migrarTipos(lista), lista);
   const vacia = [];
   assert.equal(migrarTipos(vacia), vacia);
@@ -389,7 +399,8 @@ test("importarClientes normaliza los campos que faltan y descarta lo que no sea 
   assert.equal(resultado.error, null);
   assert.equal(resultado.clientes.length, 2); // la basura se ignora
   const cliente = resultado.clientes[0];
-  assert.deepEqual(Object.keys(cliente), ["id", "fecha", "empresa", "cif", "contacto", "telefono", "movil", "email", "direccion", "codigoPostal", "tipo", "notas"]);
+  assert.deepEqual(Object.keys(cliente), ["id", "fecha", "empresa", "cif", "contacto", "telefono", "movil", "email", "direccion", "codigoPostal", "tipos", "tipo", "notas"]);
+  assert.deepEqual(cliente.tipos, []); // sin tipo en el fichero: sin tipos
   assert.equal(cliente.empresa, "Muebles Rápido"); // espacios recortados
   assert.equal(cliente.telefono, "611");
   assert.equal(cliente.cif, ""); // lo que falta, vacío
@@ -672,4 +683,271 @@ test("textoContextoImpresion conserva acentos, mayúsculas y comillas tal cual, 
     textoContextoImpresion("Espuma", 'Müller & "Hnos" <x>'),
     'Gestor de Clientes · Filtro: Espuma · Búsqueda: «Müller & "Hnos" <x>»'
   );
+});
+
+// =====================================================
+// Tipos múltiples de cliente (spec 014)
+// =====================================================
+
+test("TIPOS_FIJOS contiene los tres tipos fijos y de él pende esTipoFijo (RF-1203)", () => {
+  assert.deepEqual(TIPOS_FIJOS, ["Tela", "Espuma", "Estructuras"]);
+  assert.equal(esTipoFijo(" Tela "), true); // sigue comparando tras recortar espacios
+  assert.equal(esTipoFijo("Toldos"), false);
+});
+
+// --- normalizarTipos (RF-1202) ---
+
+test("normalizarTipos con un valor que no es array devuelve una lista vacía (RF-1202)", () => {
+  assert.deepEqual(normalizarTipos("Tela"), []);
+  assert.deepEqual(normalizarTipos({ 0: "Tela" }), []);
+  assert.deepEqual(normalizarTipos(7), []);
+  assert.deepEqual(normalizarTipos(null), []);
+  assert.deepEqual(normalizarTipos(undefined), []);
+});
+
+test("normalizarTipos recorta, quita vacíos y duplicados exactos conservando el orden (RF-1202)", () => {
+  assert.deepEqual(normalizarTipos(["  Tela  ", "Espuma", "Tela"]), ["Tela", "Espuma"]);
+  assert.deepEqual(normalizarTipos(["", "   ", "Toldos"]), ["Toldos"]);
+  assert.deepEqual(normalizarTipos(["Estructuras", "Tela", "Espuma"]), ["Estructuras", "Tela", "Espuma"]);
+});
+
+test("normalizarTipos no unifica mayúsculas ni trunca los textos largos (RF-1202, RF-1204)", () => {
+  assert.deepEqual(normalizarTipos(["tela", "Tela"]), ["tela", "Tela"]);
+  const largo = "Toldos de lona y cortinas de exterior para grandes superficies y hoteles"; // 70 caracteres
+  assert.equal(largo.length > 40, true);
+  assert.deepEqual(normalizarTipos([largo]), [largo]); // los 40 son solo del formulario
+});
+
+test("normalizarTipos convierte los elementos no textos a texto y descarta lo vacío (RF-1202)", () => {
+  assert.deepEqual(normalizarTipos([12345, null, "Tela"]), ["12345", "Tela"]);
+  assert.deepEqual(normalizarTipos([undefined, "", "Espuma"]), ["Espuma"]);
+});
+
+// --- tiposCliente: única puerta de lectura (RF-1201, RF-1202) ---
+
+test("tiposCliente con solo el tipo legado lo convierte en array (RF-1201)", () => {
+  assert.deepEqual(tiposCliente({ tipo: "Tela" }), ["Tela"]);
+  assert.deepEqual(tiposCliente({ tipo: "  Toldos  " }), ["Toldos"]);
+  assert.deepEqual(tiposCliente({ tipo: "" }), []);
+  assert.deepEqual(tiposCliente({}), []);
+  assert.deepEqual(tiposCliente(null), []);
+});
+
+test("tiposCliente con tipos con elementos los normaliza e ignora tipo por completo (RF-1202)", () => {
+  assert.deepEqual(tiposCliente({ tipos: ["Toldos", " Tela "], tipo: "Espuma" }), ["Toldos", "Tela"]);
+  // un «FOAM» residual en tipo NO pisa al array canónico
+  assert.deepEqual(tiposCliente({ tipos: ["Toldos"], tipo: "FOAM" }), ["Toldos"]);
+});
+
+test("tiposCliente con tipos que no es array lo trata como ausente y usa tipo (RF-1202)", () => {
+  assert.deepEqual(tiposCliente({ tipos: "Tela", tipo: "Espuma" }), ["Espuma"]);
+  assert.deepEqual(tiposCliente({ tipos: { 0: "Tela" }, tipo: "" }), []);
+});
+
+test("tiposCliente reconstruye tipos desde tipo cuando el array queda vacío (RF-1202)", () => {
+  assert.deepEqual(tiposCliente({ tipos: [], tipo: "Tela" }), ["Tela"]);
+  assert.deepEqual(tiposCliente({ tipos: ["  ", ""], tipo: "Tela" }), ["Tela"]);
+  assert.deepEqual(tiposCliente({ tipos: [], tipo: "" }), []);
+});
+
+test("tiposCliente migra «FOAM» a «Espuma» dentro de tipos, sin duplicar (RF-1202)", () => {
+  assert.deepEqual(tiposCliente({ tipos: ["FOAM"], tipo: "x" }), ["Espuma"]);
+  assert.deepEqual(tiposCliente({ tipos: ["FOAM", "Espuma"], tipo: "" }), ["Espuma"]);
+  assert.deepEqual(tiposCliente({ tipo: "FOAM" }), ["Espuma"]);
+});
+
+// --- migrarTipos ampliada (RF-1202) ---
+
+test("migrarTipos añade el array tipos a un cliente antiguo de 12 campos (RF-1202)", () => {
+  const lista = [Object.assign({}, CLIENTE_V1)]; // sin `tipos`, con tipo «Tela»
+  const migrada = migrarTipos(lista);
+  assert.deepEqual(migrada[0].tipos, ["Tela"]);
+  assert.equal(migrada[0].tipo, "Tela"); // el tipo visible no cambia de significado
+  assert.equal(migrada[0].notas, CLIENTE_V1.notas); // el resto de campos intacto
+  assert.equal(lista[0].tipos, undefined); // la lista original no se toca
+});
+
+test("migrarTipos es idempotente: la segunda pasada devuelve la MISMA referencia (RF-1202)", () => {
+  const lista = [{ id: 1, fecha: 1, empresa: "", cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipo: "FOAM", notas: "" }];
+  const unaPasada = migrarTipos(lista);
+  assert.deepEqual(unaPasada[0].tipos, ["Espuma"]);
+  assert.equal(unaPasada[0].tipo, "Espuma");
+  assert.equal(migrarTipos(unaPasada), unaPasada); // ya migrado: ni lista nueva ni escritura
+});
+
+test("migrarTipos reescribe tipo = tipos[0] y conserva el orden del array (RF-1201)", () => {
+  const lista = [{ id: 2, fecha: 2, empresa: "", cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipos: ["Toldos", "Tela"], tipo: "Tela", notas: "n" }];
+  const migrada = migrarTipos(lista);
+  assert.deepEqual(migrada[0].tipos, ["Toldos", "Tela"]); // orden de entrada intacto
+  assert.equal(migrada[0].tipo, "Toldos"); // el primer tipo manda
+  assert.equal(migrada[0].notas, "n");
+});
+
+test("migrarTipos trata «tipos» no array como ausente y migra FOAM dentro del array (RF-1202)", () => {
+  const lista = [
+    { id: 3, fecha: 3, empresa: "", cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipos: "Tela", tipo: "Espuma", notas: "" },
+    { id: 4, fecha: 4, empresa: "", cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipos: ["FOAM", 123, "  "], tipo: "", notas: "" }
+  ];
+  const migrada = migrarTipos(lista);
+  assert.deepEqual(migrada[0].tipos, ["Espuma"]); // reconstruido desde tipo («Tela» no manda)
+  assert.equal(migrada[0].tipo, "Espuma");
+  assert.deepEqual(migrada[1].tipos, ["Espuma", "123"]); // FOAM migrado y número a texto
+  assert.equal(migrada[1].tipo, "Espuma");
+});
+
+// --- chips del formulario: alternar/añadir/quitar (RF-1203) ---
+
+test("alternarTipoFijo marca y desmarca sin mutar la lista original (RF-1203)", () => {
+  const tipos = ["Tela"];
+  assert.deepEqual(alternarTipoFijo(tipos, "Espuma"), ["Tela", "Espuma"]); // se añade al final
+  assert.deepEqual(alternarTipoFijo(tipos, "Tela"), []); // se quita
+  assert.deepEqual(tipos, ["Tela"]); // la entrada no se toca
+});
+
+test("alternarTipoFijo con off/on vuelve al final del orden y puede cambiar tipos[0] (RF-1203)", () => {
+  const sinTela = alternarTipoFijo(["Tela", "Espuma"], "Tela");
+  assert.deepEqual(sinTela, ["Espuma"]);
+  assert.deepEqual(alternarTipoFijo(sinTela, "Tela"), ["Espuma", "Tela"]); // re-marcar: al final
+});
+
+test("añadirTipoLibre recorta el texto y lo añade al final como chip libre (RF-1203)", () => {
+  assert.deepEqual(añadirTipoLibre([], "  Toldos  "), ["Toldos"]);
+  assert.deepEqual(añadirTipoLibre(["Tela"], "Cortinas"), ["Tela", "Cortinas"]);
+});
+
+test("añadirTipoLibre con un tipo fijo escrito a mano marca el fijo, sin libre duplicado (RF-1203)", () => {
+  assert.deepEqual(añadirTipoLibre([], "Tela"), ["Tela"]);
+  assert.deepEqual(añadirTipoLibre(["Espuma"], "  Tela "), ["Espuma", "Tela"]);
+  assert.deepEqual(añadirTipoLibre(["Tela"], "Tela"), ["Tela"]); // ya marcado: sin duplicado
+  assert.deepEqual(añadirTipoLibre(["tela"], "Tela"), ["tela", "Tela"]); // «tela» minúscula es libre: no se unifican
+});
+
+test("añadirTipoLibre no duplica libres, no trunca y el vacío no añade nada (RF-1203)", () => {
+  assert.deepEqual(añadirTipoLibre(["Toldos"], "Toldos"), ["Toldos"]);
+  assert.deepEqual(añadirTipoLibre(["Tela"], "   "), ["Tela"]);
+  assert.deepEqual(añadirTipoLibre([], ""), []);
+  const largo = "Estructuras metálicas, toldos tensados y lonas para industriales de gran envergadura"; // > 40
+  assert.equal(largo.length > 40, true);
+  assert.deepEqual(añadirTipoLibre([], largo), [largo]);
+  assert.deepEqual(añadirTipoLibre([], "FOAM"), ["FOAM"]); // escrito a mano queda como libre (lo migrará al recargar)
+});
+
+test("quitarTipoLibre quita solo ese texto exacto y sin efecto si no estaba (RF-1203)", () => {
+  assert.deepEqual(quitarTipoLibre(["Tela", "Toldos", "Cortinas"], "Toldos"), ["Tela", "Cortinas"]);
+  assert.deepEqual(quitarTipoLibre(["Tela"], "Toldos"), ["Tela"]);
+});
+
+// --- filtros por pertenencia (RF-1205) ---
+
+const LISTA_TIPOS = [
+  { id: 21, fecha: 1, empresa: "Mixto SL", cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipos: ["Tela", "Espuma"], tipo: "Tela", notas: "" },
+  { id: 22, fecha: 2, empresa: "Toldos Sur", cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipos: ["Tela", "Toldos"], tipo: "Tela", notas: "" },
+  { id: 23, fecha: 3, empresa: "Sin Tipo SL", cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipos: [], tipo: "", notas: "" },
+  { id: 24, fecha: 4, empresa: "Delta Estructuras", cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipo: "Estructuras", notas: "" } // legado sin tipos
+];
+
+test("filtrarClientes por pertenencia: el cliente aparece en TODAS sus pestañas de tipo (RF-1205)", () => {
+  assert.deepEqual(filtrarClientes(LISTA_TIPOS, "Tela").map(c => c.id), [21, 22]);
+  assert.deepEqual(filtrarClientes(LISTA_TIPOS, "Espuma").map(c => c.id), [21]);
+  assert.deepEqual(filtrarClientes(LISTA_TIPOS, "Estructuras").map(c => c.id), [24]); // el legado filtra igual que antes
+});
+
+test("filtrarClientes «Otros» agrupa a quien tenga algún tipo no fijo; sin tipos solo en «Todos» (RF-1205)", () => {
+  assert.deepEqual(filtrarClientes(LISTA_TIPOS, "Otros").map(c => c.id), [22]); // «Tela + Toldos» también aparece en Tela
+  assert.deepEqual(filtrarClientes(LISTA_TIPOS, "Todos").map(c => c.id), [21, 22, 23, 24]);
+});
+
+// --- búsqueda en todos los tipos (RF-1206) ---
+
+test("buscarClientes encuentra por cualquier tipo y multi-palabra repartida entre tipos (RF-1206)", () => {
+  assert.deepEqual(buscarClientes(LISTA_TIPOS, "espuma").map(c => c.id), [21]);
+  assert.deepEqual(buscarClientes(LISTA_TIPOS, "tela toldos").map(c => c.id), [22]);
+  assert.deepEqual(buscarClientes(LISTA_TIPOS, "tela").map(c => c.id), [21, 22]);
+});
+
+test("buscarClientes sigue encontrando «Sin tipo» en los clientes sin tipos (RF-1206)", () => {
+  assert.deepEqual(buscarClientes(LISTA_TIPOS, "sin tipo").map(c => c.id), [23]);
+});
+
+// --- celda unida del listado (RF-1208) ---
+
+test("unirTiposTexto une los tipos con « + » y da «Sin tipo» sin ninguno (RF-1208)", () => {
+  assert.equal(unirTiposTexto(["Tela", "Espuma", "Toldos"]), "Tela + Espuma + Toldos");
+  assert.equal(unirTiposTexto(["Tela"]), "Tela");
+  assert.equal(unirTiposTexto([]), "Sin tipo");
+  assert.equal(unirTiposTexto(undefined), "Sin tipo");
+});
+
+test("construirCeldas muestra en la celda Tipo todos los tipos unidos (RF-1208)", () => {
+  const cliente = { id: 30, fecha: 1, empresa: "", cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipos: ["Tela", "Espuma", "Toldos"], tipo: "Tela", notas: "" };
+  assert.equal(construirCeldas(cliente, ["tipo"], HOY)[0].valor, "Tela + Espuma + Toldos");
+  assert.equal(construirCeldas(CLIENTE_SIN_DATOS, ["tipo"], HOY)[0].valor, "Sin tipo"); // sin tipos: como siempre
+});
+
+// --- guardado con tipos (RF-1204) ---
+
+test("construirCliente con tipos normaliza el array y deriva tipo = tipos[0] (RF-1204)", () => {
+  const nuevo = construirCliente(formulario({ empresa: "Mixto", tipo: "ignorado" }), 900, 1760000000000, ["  Tela ", "Espuma", "Toldos", "Tela"]);
+  assert.deepEqual(nuevo.tipos, ["Tela", "Espuma", "Toldos"]);
+  assert.equal(nuevo.tipo, "Tela");
+  assert.equal(nuevo.empresa, "Mixto");
+});
+
+test("construirCliente con lista de tipos vacía escribe tipos [] y tipo «» (RF-1204)", () => {
+  const vacio = construirCliente(formulario({ empresa: "Nada", tipo: "Tela" }), 901, 1760000000000, []);
+  assert.deepEqual(vacio.tipos, []);
+  assert.equal(vacio.tipo, ""); // el array elegido manda sobre el string legado
+});
+
+test("construirCliente sin el parámetro tipos deriva el array del tipo legado (RF-1204)", () => {
+  const legado = construirCliente(formulario({ tipo: "  Toldos  " }), 902, 1760000000000);
+  assert.deepEqual(legado.tipos, ["Toldos"]);
+  assert.equal(legado.tipo, "Toldos");
+  const ninguno = construirCliente(formulario({}), 903, 1760000000000);
+  assert.deepEqual(ninguno.tipos, []);
+  assert.equal(ninguno.tipo, "");
+});
+
+test("aplicarEdicion con tipos conserva id/fecha y no toca el resto de la lista (RF-1204)", () => {
+  const editada = aplicarEdicion(LISTA_TIPOS, 21, formulario({ empresa: "Mixto SL", tipo: "Tela" }), ["Tela", "Toldos"]);
+  const editado = buscarCliente(editada, 21);
+  assert.deepEqual(editado.tipos, ["Tela", "Toldos"]);
+  assert.equal(editado.tipo, "Tela");
+  assert.equal(editado.id, 21);
+  assert.equal(editado.fecha, LISTA_TIPOS[0].fecha);
+  assert.deepEqual(buscarCliente(editada, 22), LISTA_TIPOS[1]); // el resto intacto
+});
+
+// --- exportar/importar con tipos (RF-1209) ---
+
+test("importarClientes conserva y normaliza el array tipos de un fichero nuevo (RF-1209)", () => {
+  const resultado = importarClientes(JSON.stringify([
+    { id: 40, fecha: 1700000000000, empresa: "Mixto", cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipos: ["  Tela ", "Espuma", "Tela"], tipo: "Tela", notas: "" }
+  ]));
+  assert.equal(resultado.error, null);
+  assert.deepEqual(resultado.clientes[0].tipos, ["Tela", "Espuma"]);
+  assert.equal(resultado.clientes[0].tipo, "Tela");
+});
+
+test("importarClientes convierte el fichero antiguo (solo tipo) y trata «tipos» no array como ausente (RF-1209)", () => {
+  const resultado = importarClientes(JSON.stringify([
+    { id: 41, fecha: 1700000000000, empresa: "Viejo", cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipo: "Toldos", notas: "" },
+    { id: 42, fecha: 1700000000000, empresa: "Raro", cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipos: "Tela", tipo: "Espuma", notas: "" }
+  ]));
+  assert.equal(resultado.error, null);
+  assert.deepEqual(resultado.clientes[0].tipos, ["Toldos"]);
+  assert.equal(resultado.clientes[0].tipo, "Toldos");
+  assert.deepEqual(resultado.clientes[1].tipos, ["Espuma"]); // reconstruido desde tipo
+});
+
+test("importarClientes migra «FOAM» dentro de tipos y conserva los literales de error (RF-1209)", () => {
+  const resultado = importarClientes(JSON.stringify([
+    { id: 43, fecha: 1700000000000, empresa: "Foam SL", cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipos: ["FOAM"], tipo: "FOAM", notas: "" }
+  ]));
+  assert.equal(resultado.error, null);
+  assert.deepEqual(resultado.clientes[0].tipos, ["Espuma"]);
+  assert.equal(resultado.clientes[0].tipo, "Espuma");
+  // los dos literales de error siguen intactos (regresión de la 011)
+  assert.equal(importarClientes("basura {{{").error, "El archivo no tiene un formato JSON válido");
+  assert.equal(importarClientes('{"empresa":"Textiles Norte"}').error, "El archivo no contiene una lista de clientes");
 });

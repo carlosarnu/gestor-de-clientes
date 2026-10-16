@@ -111,11 +111,6 @@ h2 {
   gap: 6px;
 }
 
-/* El atributo hidden debe ganar al display:flex del campo (spec 008) */
-.campo[hidden] {
-  display: none;
-}
-
 .campo label {
   font-size: 0.85rem;
   font-weight: 700;
@@ -123,7 +118,6 @@ h2 {
 }
 
 .campo input,
-.campo select,
 .campo textarea {
   font: inherit;
   padding: 10px 12px;
@@ -135,7 +129,6 @@ h2 {
 }
 
 .campo input:focus,
-.campo select:focus,
 .campo textarea:focus {
   outline: 2px solid var(--tinta);
   outline-offset: 1px;
@@ -144,6 +137,29 @@ h2 {
 
 .campo textarea {
   resize: vertical;
+}
+
+/* Título visible de un grupo de controles del formulario (spec 014): mismo
+   aspecto que una etiqueta de campo, pero describe al grupo #chips-tipos
+   (aria-labelledby), no a un control suelto */
+.campo-titulo {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--tinta-media);
+  margin: 0;
+}
+
+/* Campo «Añadir otro tipo» + su botón (spec 014, RF-1203): en pantalla
+  estrecha el botón baja a su propia línea (flex-wrap), sin desbordes */
+.anadir-tipo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.anadir-tipo input {
+  flex: 1 1 180px;
+  min-width: 0; /* el input puede encoger sin forzar scroll horizontal */
 }
 
 .acciones-formulario {
@@ -418,6 +434,48 @@ h2 {
   background: #2e3830;
 }
 
+/* ===== Chips del formulario: tipos de cliente (spec 014, RF-1203) ===== */
+
+/* Chip libre: un chip normal (mismas medidas del .chip de la 012) con un
+   botón «×» dentro para quitarlo; al no ser él mismo un botón, no se puede
+   pulsar (solo la «×» actúa) y por eso no lleva cursor de clickeado */
+.chip-libre {
+  padding: 0 2px 0 14px;
+  gap: 2px;
+  cursor: default;
+}
+
+.chip-libre:hover {
+  background: var(--superficie); /* sin hover de chip: el clic lo tiene la «×» */
+}
+
+/* «×» de quitar: 44 × 44 px reales (objetivo táctil), redonda y sin borde,
+   heredando el texto del chip; el foco va dentro del chip (outline inset) */
+.chip-quitar {
+  font: inherit;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.chip-quitar:hover {
+  background: var(--linea-suave);
+}
+
+.chip-quitar:focus-visible {
+  outline: 2px solid var(--tinta);
+  outline-offset: -3px;
+}
+
 /* ===== Copia de seguridad (spec 011, RF-901) ===== */
 
 .copia-seguridad {
@@ -531,6 +589,17 @@ h2 {
   font-size: 1.05rem;
   font-weight: 800;
   letter-spacing: -0.01em;
+}
+
+/* Varios badges (spec 014, RF-1207): se agrupan juntos a la derecha de la
+   cabecera (con un solo badge el aspecto es idéntico al de siempre) y
+   envuelven línea a línea sin desbordes, también a 375 px */
+.etiquetas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
 .etiqueta {
@@ -1013,7 +1082,8 @@ h2 {
   }
 
   /* Cabecera de contexto (spec 013): existe solo para el papel y aquí se ve, con
-     tipografía de título un punto menor que el <h2> de la lista (van los dos) */
+     tipografía de título un punto menor que el <h2> de la lista (que en papel
+     NO se imprime: arriba queda oculto y la sustituye esta cabecera) */
   .cabecera-impresion {
     display: block;
     font-size: 1.05rem;

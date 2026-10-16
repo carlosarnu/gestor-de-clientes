@@ -1,8 +1,8 @@
 # AGENTS.md — Gestor de Clientes
 
 Web estática y portable para que un comercial autónomo gestione sus clientes
-(empresa, CIF, contacto, teléfono, email, dirección, tipo: Tela, Espuma, Estructuras u Otros,
-y notas) mediante almacenamiento local. Pensada para abrirse con doble clic y
+(empresa, CIF, contacto, teléfono, email, dirección, varios tipos de cliente — Tela,
+Espuma, Estructuras u otros —, y notas) mediante almacenamiento local. Pensada para abrirse con doble clic y
 funcionar sin servidor. La misma web se empaqueta como **aplicación de escritorio** (`escritorio/`, Electron, spec 011) guardando en `Documentos\Gestor de Clientes\clientes.json`.
 
 ## Stack y estructura
@@ -33,12 +33,16 @@ funcionar sin servidor. La misma web se empaqueta como **aplicación de escritor
 ## Datos
 
 - `localStorage`, clave única `gestorClientes` (JSON con un array de clientes).
-- Esquema del cliente: `{ id, fecha, empresa, cif, contacto, telefono, movil, email,
-  direccion, codigoPostal, tipo, notas }`. **Ningún campo es obligatorio** (spec 007):
-  lo vacío se muestra como «Sin nombre»/«Sin tipo».
-- `tipo` se guarda como uno de los tres fijos (`"Tela" | "Espuma" | "Estructuras"`), como
-  `"Otros"` o como el **texto libre** escrito al elegir «Otros» (spec 008). El valor
-  antiguo «FOAM» se convierte en «Espuma» al cargar (`migrarTipos`, spec 009): ningún
+- Esquema del cliente (**13 campos**): `{ id, fecha, empresa, cif, contacto, telefono,
+  movil, email, direccion, codigoPostal, tipos, tipo, notas }`. **Ningún campo es
+  obligatorio** (spec 007): lo vacío se muestra como «Sin nombre»/«Sin tipo».
+- `tipos` es un **array canónico** con todos los tipos del cliente (los tres fijos
+  `"Tela" | "Espuma" | "Estructuras"` y **texto libre** sin límite, en orden de adición y
+  sin duplicados; spec 014). `tipo` es un **string de compatibilidad, solo de lectura**:
+  `tipos[0] ?? ""` (para lectores antiguos; la lectura efectiva pasa siempre por
+  `tiposCliente`). **Migración idempotente** al cargar e importar (`migrarTipos`, spec
+  014): añade `tipos` y reescribe `tipo`, y **no escribe nada** si ya está migrado; el
+  valor antiguo «FOAM» se convierte en «Espuma» dentro de `tipos` (spec 009): ningún
   cliente guardado se pierde.
 - `fecha` es timestamp de época (`Date.now()`); la lista se ordena del más reciente
   al más antiguo (ver skill `local-dates` al tocar fechas).
@@ -53,7 +57,8 @@ funcionar sin servidor. La misma web se empaqueta como **aplicación de escritor
   tarjeta («¿Seguro? · Sí, eliminar / No»), sin `confirm()` nativo. Avisos breves en un
   toast de 2,5 s.
 - **Filtros (Todos / Tela / Espuma / Estructuras / Otros)**: pestañas con `data-filtro` =
-  valor interno (`"Espuma"` para la pestaña Espuma). El desplegable funciona igual.
+  valor interno (`"Espuma"` para la pestaña Espuma), con filtrado **por pertenencia**
+  (spec 014): un cliente de varios tipos sale en la pestaña de cada uno de sus tipos.
 - **Buscador por texto (spec 005)**: campo «Buscar cliente» que filtra en vivo mientras
   se escribe, con todas las palabras («y») repartidas entre los campos, ignorando
   acentos y mayúsculas. Se combina con el filtro de tipo y sobrevive a cambios de
@@ -73,10 +78,11 @@ funcionar sin servidor. La misma web se empaqueta como **aplicación de escritor
 - **Formulario libre y campos nuevos (spec 007)**: nada es obligatorio; la ficha muestra
   «Sin nombre»/«Sin tipo» cuando faltan. Campos **Móvil** y **Código postal** en
   formulario, ficha y buscador; el mapa usa dirección + código postal.
-- **Tipo «Otros» (spec 008)**: el desplegable tiene una cuarta opción «Otros» que abre
-  un campo para escribir el tipo («Toldos»…; vacío = «Otros»). Los tipos no fijos se
-  agrupan en la pestaña de filtro **Otros** (violeta) y comparten ese color en la ficha;
-  los «Sin tipo» siguen solo en «Todos».
+- ~~Desplegable de tipo con «Otros» (spec 008)~~: el desplegable «Tipo de cliente» y su
+  campo condicional **retirados por la spec 014** — ahora son **chips de selección
+  múltiple** con texto libre sin límite. Sigue vigente lo demás de la 008: los tipos no
+  fijos se agrupan en la pestaña de filtro **Otros** (violeta) y comparten ese color en la
+  ficha; los «Sin tipo» siguen solo en «Todos».
 - **Renombrado FOAM → Espuma (spec 009)**: el valor interno del tipo pasó a «Espuma»
   (HTML, CSS, JS y datos) con migración automática al abrir (`migrarTipos`); además
   cinta de la cabecera a 4 colores, «Correo electrónico» en la ficha y docs al día.
@@ -110,6 +116,18 @@ funcionar sin servidor. La misma web se empaqueta como **aplicación de escritor
   columna «Acciones» ni chrome interactivo—; el `<h2>` de la lista no se imprime (la
   cabecera de contexto ya lo lleva). Sin claves nuevas ni dependencias: es presentación
   pura (`@media print`).
+- **Tipos múltiples (spec 014)**: un cliente admite **varios tipos a la vez**. El
+  formulario usa **chips de selección múltiple** en lugar del desplegable: los tres tipos
+  fijos como casillas generadas desde `TIPOS_FIJOS` (marcado visible con `aria-checked`,
+  no solo color) + campo **«Añadir otro tipo»** para texto libre **sin límite** (el
+  `maxlength="40"` es solo del input; la lógica no trunca), con «×» para quitar cada chip
+  libre; **nada es obligatorio** y la selección vive solo en memoria (**sin claves
+  nuevas**). Los filtros son **por pertenencia**: un multi-tipo sale en cada pestaña de
+  sus tipos y en **«Otros»** si tiene tipos libres (los sin tipos solo en «Todos»). La
+  tarjeta pinta **un badge por tipo** con el **canto del primer tipo**; el listado y la
+  impresión muestran la celda unida («Tela + Espuma»). Se guarda con `tipos` (array) +
+  `tipo` = `tipos[0] ?? ""` (compatibilidad de lectura), con migración idempotente en las
+  tres rutas de carga (web, escritorio, importar).
 
 ## Forma de trabajar (SDD)
 

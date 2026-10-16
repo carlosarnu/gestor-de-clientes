@@ -61,21 +61,23 @@
           <input type="text" id="codigo-postal" name="codigoPostal" autocomplete="postal-code" inputmode="numeric">
         </div>
 
+        <!-- Tipos de cliente (spec 014, RF-1203): chips de selección múltiple en
+             lugar del desplegable de la 008. Los tres chips fijos los pinta
+             app.js desde TIPOS_FIJOS (fuente única) y los libres (con su «×»)
+             se añaden con el campo de abajo; nada es obligatorio (spec 007) -->
         <div class="campo">
-          <label for="tipo">Tipo de cliente</label>
-          <select id="tipo" name="tipo" autocomplete="off">
-            <option value="" selected disabled>Selecciona un tipo</option>
-            <option value="Tela">Tela</option>
-            <option value="Espuma">Espuma</option>
-            <option value="Estructuras">Estructuras</option>
-            <option value="Otros">Otros</option>
-          </select>
+          <p class="campo-titulo" id="titulo-tipos">Tipos de cliente</p>
+          <div class="chips" id="chips-tipos" role="group" aria-labelledby="titulo-tipos"></div>
         </div>
 
-        <!-- Tipo escrito a mano: solo aparece con «Otros» (spec 008, RF-601/RF-602) -->
-        <div class="campo" id="campo-tipo-otro" hidden>
-          <label for="tipo-otro">Escribe el tipo de cliente</label>
-          <input type="text" id="tipo-otro" name="tipoOtro" autocomplete="off" maxlength="40" placeholder="p. ej. Toldos">
+        <!-- Cada texto se limita a 40 caracteres SOLO aquí, en el formulario:
+             la lógica y la importación no truncan (RF-1203/RF-1209) -->
+        <div class="campo">
+          <label for="tipo-otro">Añadir otro tipo</label>
+          <div class="anadir-tipo">
+            <input type="text" id="tipo-otro" autocomplete="off" maxlength="40" placeholder="p. ej. Toldos">
+            <button type="button" class="boton-secundario" id="boton-anadir-tipo">Añadir</button>
+          </div>
         </div>
 
         <div class="campo campo-completo">
