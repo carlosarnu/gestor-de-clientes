@@ -32,6 +32,10 @@ const textoConfirmacionImportar = document.getElementById("confirmacion-importac
 const botonReemplazar = document.getElementById("boton-reemplazar");
 const botonCancelarImportacion = document.getElementById("boton-cancelar-importacion");
 
+// Impresión del listado (spec 013, RF-1101/RF-1103)
+const botonImprimir = document.getElementById("boton-imprimir");
+const cabeceraImpresion = document.getElementById("cabecera-impresion");
+
 // Conmutador de vista y selector de campos (spec 012, RF-1001/RF-1002)
 const conmutador = document.getElementById("conmutador");
 const selectorCampos = document.getElementById("selector-campos");
@@ -519,14 +523,46 @@ botonCancelarImportacion.addEventListener("click", function () {
   ocultarConfirmacionImportacion();
 });
 
+// «Imprimir» (spec 013, RF-1101/RF-1102): con clientes visibles abre el diálogo
+// nativo del navegador (window.print(), permitido: la prohibición constitucional es
+// confirm()/alert()); con CERO visibles (lista vacía, filtro sin resultados o
+// búsqueda sin coincidencias), aviso breve y SIN diálogo. El guardia es SOLO del
+// botón: Ctrl+P / menú «Imprimir…» del navegador no se intercepta. No toca datos,
+// claves, vista, filtro ni búsqueda.
+botonImprimir.addEventListener("click", function () {
+  if (visiblesActuales().length === 0) {
+    pintarAviso("No hay clientes para imprimir");
+    return;
+  }
+  window.print();
+});
+
+// Cabecera de contexto impresa (spec 013, RF-1103, plan §5): se rellena SIEMPRE en
+// el propio momento de imprimir. El navegador dispara «beforeprint» con la ruta del
+// botón (window.print()) Y con la ruta nativa (Ctrl+P / menú «Imprimir…»), así que
+// una única escucha cubre las dos con el texto fresco del filtro y la búsqueda
+// vigentes (Decisión 12 de la spec). No se rellena también en el clic del botón:
+// sería duplicar el cálculo sin añadir nada (beforeprint se dispara antes de
+// capturar la hoja). textContent pinta seguro, sin innerHTML.
+window.addEventListener("beforeprint", function () {
+  cabeceraImpresion.textContent = textoContextoImpresion(filtroActivo, textoBusqueda);
+});
+
 // =====================================================
 // Lista de clientes
 // =====================================================
 
+// Clientes visibles en la lista AHORA: orden (más reciente primero) + filtro de
+// tipo + búsqueda de texto, con la lógica pura de logica.js. Compartida entre el
+// pintado y el guardia de «Imprimir» (plan §5): un solo cálculo, imposible que el
+// guardia y lo que se pinta divergan.
+function visiblesActuales() {
+  return buscarClientes(filtrarClientes(ordenarClientes(clientes), filtroActivo), textoBusqueda);
+}
+
 function pintarLista() {
-  // Del más reciente al más antiguo, filtro de tipo y búsqueda de texto (lógica en logica.js)
-  const porTipo = filtrarClientes(ordenarClientes(clientes), filtroActivo);
-  const visibles = buscarClientes(porTipo, textoBusqueda);
+  // Mismos visibles de siempre (filtro + búsqueda + orden, lógica en logica.js)
+  const visibles = visiblesActuales();
 
   // Contador de clientes (refleja tipo + búsqueda)
   contador.textContent = textoContador(visibles.length);

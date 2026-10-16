@@ -38,7 +38,8 @@ const {
   construirFilas,
   dosDigitos,
   importarClientes,
-  escaparAtributo
+  escaparAtributo,
+  textoContextoImpresion
 } = require("./logica.js");
 
 // Ayuda: un formulario falso con la interfaz de FormData (.get)
@@ -616,4 +617,59 @@ test("escaparAtributo sobre una celda real de construirCeldas deja el valor sin 
   const pintado = escaparAtributo(celda.valor);
   assert.equal(celda.valor, 'x" onmouseover="window.__inyectado=1'); // la lógica pura NO maquilla
   assert.equal(pintado.indexOf('"'), -1); // el pintado en atributo, sí
+});
+
+// ===== Cabecera de impresión (spec 013, RF-1104) =====
+
+test("textoContextoImpresion sin filtro ni búsqueda da solo el título (RF-1104)", () => {
+  assert.equal(textoContextoImpresion("Todos", ""), "Gestor de Clientes");
+});
+
+test("textoContextoImpresion con filtro «Tela» añade la pieza del filtro (RF-1104)", () => {
+  assert.equal(textoContextoImpresion("Tela", ""), "Gestor de Clientes · Filtro: Tela");
+});
+
+test("textoContextoImpresion nunca muestra «Todos» (RF-1104)", () => {
+  assert.equal(
+    textoContextoImpresion("Todos", "vega"),
+    "Gestor de Clientes · Búsqueda: «vega»"
+  );
+});
+
+test("textoContextoImpresion con filtro y búsqueda da el formato literal completo (RF-1104)", () => {
+  assert.equal(
+    textoContextoImpresion("Tela", "vega"),
+    "Gestor de Clientes · Filtro: Tela · Búsqueda: «vega»"
+  );
+});
+
+test("textoContextoImpresion con filtro «Otros» lo muestra literal (RF-1104)", () => {
+  assert.equal(textoContextoImpresion("Otros", ""), "Gestor de Clientes · Filtro: Otros");
+});
+
+test("textoContextoImpresion recorta la búsqueda y omite la de solo espacios (RF-1104)", () => {
+  assert.equal(
+    textoContextoImpresion("Todos", "  vega "),
+    "Gestor de Clientes · Búsqueda: «vega»"
+  );
+  assert.equal(
+    textoContextoImpresion("Tela", "   "),
+    "Gestor de Clientes · Filtro: Tela"
+  );
+});
+
+test("textoContextoImpresion con filtro vacío o ausente se comporta como «Todos» (RF-1104)", () => {
+  assert.equal(
+    textoContextoImpresion("", "vega"),
+    "Gestor de Clientes · Búsqueda: «vega»"
+  );
+  assert.equal(textoContextoImpresion(undefined, ""), "Gestor de Clientes");
+  assert.equal(textoContextoImpresion(null, null), "Gestor de Clientes");
+});
+
+test("textoContextoImpresion conserva acentos, mayúsculas y comillas tal cual, sin marcado (RF-1104)", () => {
+  assert.equal(
+    textoContextoImpresion("Espuma", 'Müller & "Hnos" <x>'),
+    'Gestor de Clientes · Filtro: Espuma · Búsqueda: «Müller & "Hnos" <x>»'
+  );
 });

@@ -208,6 +208,18 @@ h2 {
   margin: 0;
 }
 
+/* ===== Impresión del listado (spec 013, RF-1103) ===== */
+
+/* La cabecera de contexto existe SOLO para el papel: en pantalla está oculta y
+   T-05 la mostrará dentro de @media print. Uso display:none (no el atributo
+   hidden del HTML) para que el bloque de impresión la active con una regla
+   simple, sin luchar con [hidden] ni !important. El aria-hidden del HTML la
+   saca también de lectores: en pantalla el estado real lo dan el contador y
+   los estados vacíos */
+.cabecera-impresion {
+  display: none;
+}
+
 /* ===== Buscador por texto (spec 005) ===== */
 
 .buscador {
@@ -804,8 +816,13 @@ h2 {
   border-right: 2px solid var(--tinta);
 }
 
-/* Móvil: filas apiladas etiqueta+valor, sin scroll horizontal (RF-1004) */
-@media (max-width: 768px) {
+/* Móvil (SOLO PANTALLA): filas apiladas etiqueta+valor, sin scroll horizontal
+   (RF-1004). En la spec 013 (RF-1103) se restringe a `screen`: el ancho de lo
+   impreso lo decide el papel, no la ventana, así que EN PAPEL el listado sale
+   SIEMPRE como tabla con su thead, aunque la pantalla mida 375 px (Decisión 2
+   del plan: se restringe aquí en vez de duplicar todas estas reglas dentro de
+   @media print, que divergirían con cada cambio de la 012) */
+@media screen and (max-width: 768px) {
   .listado,
   .listado tbody,
   .listado tr,
@@ -953,5 +970,107 @@ h2 {
     transition: none !important;
     animation: none !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* ===== Impresión del listado (spec 013, RF-1103) ===== */
+
+/* Solo papel: se imprime lo que se ve (vista actual + filtro + búsqueda + campos
+   elegidos), sin el chrome interactivo/decorativo de la aplicación. TODO va dentro
+   de @media print: en pantalla no cambia absolutamente nada. El ancho de lo
+   impreso lo decide el papel, no la pantalla (T-06 ajusta columnas, cortes de
+   página y texto completo de celdas). No se fuerzan fondos: el papel se queda con
+   negro sobre blanco; los cantos de color de las tarjetas los imprime el navegador
+   si el usuario habilita los fondos en su diálogo. Se imprime la cabecera de
+   contexto de arriba; el <h2> «Clientes» de la lista NO (Decisión 10 de la spec:
+   en papel basta la cabecera de contexto «Gestor de Clientes · …») */
+@media print {
+  /* Chrome de la aplicación: cabecera decorativa con cinta, formulario completo,
+     título «Clientes» de la lista, pestañas de filtro, buscador, conmutador,
+     contador «N clientes», botones («Imprimir», Exportar/Importar), confirmación
+     en línea de la importación, selector de campos (chips y su título «Campos
+     del listado»), acciones de tarjeta («Editar»/«Eliminar»), «¿Seguro? · Sí,
+     eliminar / No», TODA la columna «Acciones» del listado (el th y los td
+     comparten .acciones-celda), mapa (iframe y enlace «Ver en Google Maps») y
+     toast */
+  .cabecera,
+  .lista-cabecera h2,
+  #panel-formulario,
+  .filtros,
+  .buscador,
+  .conmutador,
+  .contador,
+  #boton-imprimir,
+  .copia-seguridad,
+  .confirmacion-importacion,
+  .selector-campos,
+  .tarjeta-acciones,
+  .confirmacion,
+  .acciones-celda,
+  .mapa-caja,
+  .toast {
+    display: none;
+  }
+
+  /* Cabecera de contexto (spec 013): existe solo para el papel y aquí se ve, con
+     tipografía de título un punto menor que el <h2> de la lista (van los dos) */
+  .cabecera-impresion {
+    display: block;
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 0 0 4px;
+  }
+
+  /* La marca de edición es de pantalla (RF-1003): en papel el cliente sale con
+     sus datos y sin marcas. Se restauran los bordes/tinte de una tarjeta o fila
+     normal, conservando el canto de color del tipo */
+  .tarjeta.editando {
+    border-top-color: var(--linea);
+    border-right-color: var(--linea);
+    border-bottom-color: var(--linea);
+    box-shadow: none;
+  }
+
+  .listado .fila.editando td {
+    border-top: none;
+    border-bottom: 1px solid var(--linea-suave);
+    background: none;
+  }
+
+  .listado .fila.editando td:last-child {
+    border-right: none;
+  }
+
+  /* ===== Papel: tabla siempre, una columna y paginación (spec 013, RF-1103) ===== */
+
+  /* El ancho de lo impreso lo decide el PAPEL: el listado sale SIEMPRE como
+     tabla con su cabecera de columnas visible y repetida en cada página (el
+     bloque apilado de la 012 está restringido a screen, ahí arriba) */
+  .listado thead {
+    display: table-header-group;
+  }
+
+  /* Sin «…» en papel: el valor de las celdas sale COMPLETO (Decisión 8: el
+     corte con «…» y el title son recursos de pantalla) */
+  .listado th,
+  .listado td {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  /* Tarjetas en UNA sola columna: se anulan las 2/3 columnas de los bloques
+     min-width (misma especificidad, pero este bloque va al final del fichero
+     y gana por orden) */
+  .lista-clientes {
+    grid-template-columns: 1fr;
+  }
+
+  /* Paginación: ni tarjeta ni fila se cortan entre páginas; la cabecera de la
+     tabla se repite por ser thead (table-header-group, arriba) */
+  .tarjeta,
+  .listado tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 }

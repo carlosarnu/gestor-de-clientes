@@ -97,6 +97,19 @@ funcionar sin servidor. La misma web se empaqueta como **aplicación de escritor
   en una línea cortada con «…» + `title`. **La vista y la selección NO se persisten**
   (RF-1006): cada arranque empieza en «Tarjetas» con solo «Empresa» y no se crea ninguna
   clave nueva de `localStorage`.
+- **Impresión del listado (spec 013)**: botón **«Imprimir»** en la cabecera de la lista
+  (visible en las dos vistas) que imprime **lo que se ve** —vista actual, filtro, búsqueda
+  y campos elegidos— con `window.print()` (diálogo nativo del navegador); con cero
+  clientes visibles avisa («No hay clientes para imprimir») **sin** abrir el diálogo (esa
+  guardia es solo del botón; Ctrl+P / menú del navegador no se intercepta). La hoja sale
+  limpia: solo la **cabecera de contexto** («Gestor de Clientes · Filtro: X ·
+  Búsqueda: «texto»», texto puro de `textoContextoImpresion` en `logica.js`), rellenada
+  **fresca en cada impresión** vía `beforeprint` (cubre el botón y Ctrl+P), y el listado
+  de la vista activa —tabla con su cabecera de columnas repetida en cada página, tarjetas
+  en una sola columna y sin cortes entre páginas, texto completo sin «…», sin mapa, sin
+  columna «Acciones» ni chrome interactivo—; el `<h2>` de la lista no se imprime (la
+  cabecera de contexto ya lo lleva). Sin claves nuevas ni dependencias: es presentación
+  pura (`@media print`).
 
 ## Forma de trabajar (SDD)
 

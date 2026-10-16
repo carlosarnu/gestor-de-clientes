@@ -375,6 +375,29 @@ function construirFilas(clientes, campos, hoy) {
   });
 }
 
+// =====================================================
+// Impresión del listado: cabecera de contexto (spec 013, RF-1104)
+// =====================================================
+
+// Texto de la cabecera impresa en papel: «Gestor de Clientes» + «Filtro: X» (solo
+// si el filtro no es «Todos» ni viene vacío; la etiqueta es la de la pestaña tal
+// cual, «Otros» literal) + «Búsqueda: «texto»» (solo si tras recortar queda algo),
+// unidas por « · » y con las piezas vacías omitidas — Decisión 6 de la spec.
+// Texto plano SIN HTML: la seguridad al pintarla la da textContent en app.js;
+// conserva acentos, mayúsculas y comillas tal cual las escribió el usuario.
+function textoContextoImpresion(filtro, busqueda) {
+  const piezas = ["Gestor de Clientes"];
+  const filtroLimpio = texto(filtro);
+  if (filtroLimpio !== "" && filtroLimpio !== "Todos") {
+    piezas.push("Filtro: " + filtroLimpio);
+  }
+  const busquedaLimpia = texto(busqueda);
+  if (busquedaLimpia !== "") {
+    piezas.push("Búsqueda: «" + busquedaLimpia + "»");
+  }
+  return piezas.join(" · ");
+}
+
 // En Node (tests) exportamos las funciones; en el navegador no existe `module` y se omite.
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
@@ -408,6 +431,7 @@ if (typeof module !== "undefined" && module.exports) {
     alternarCampo,
     fechaTextoLocal,
     construirCeldas,
-    construirFilas
+    construirFilas,
+    textoContextoImpresion
   };
 }

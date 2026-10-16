@@ -94,6 +94,11 @@
 
     <!-- Lista de clientes -->
     <section class="panel">
+      <!-- Cabecera de contexto impresa (spec 013, RF-1103): existe SOLO para el
+           papel; en pantalla está oculta (styles.css) y el texto lo rellena app.js
+           en el evento «beforeprint», al imprimir -->
+      <p class="cabecera-impresion" id="cabecera-impresion" aria-hidden="true"></p>
+
       <div class="lista-cabecera">
         <h2>Clientes</h2>
 
@@ -103,6 +108,10 @@
           <button type="button" class="activo" data-vista="tarjetas" aria-pressed="true">Tarjetas</button>
           <button type="button" data-vista="listado" aria-pressed="false">Listado</button>
         </div>
+
+        <!-- Botón «Imprimir» (spec 013, RF-1101): tras el conmutador y visible en las
+             dos vistas; imprime lo que se ve y no toca datos, filtro, búsqueda ni vista -->
+        <button type="button" class="boton-secundario" id="boton-imprimir">Imprimir</button>
 
         <p class="contador" id="contador"></p>
       </div>
