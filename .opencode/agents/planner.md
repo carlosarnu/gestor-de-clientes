@@ -6,7 +6,7 @@ permissions:
     resource: "*"
     effect: deny
   - action: edit
-    resource: "docs/specs/**"
+    resource: "specs/**"
     effect: allow
   - action: shell
     resource: "*"
@@ -24,11 +24,11 @@ siguiendo la skill sdd. Nunca escribes código.
 
 ## Antes de empezar 
 Lee docs/constitution.md, AGENTS.md, MEMORY.md y el código afectado. Solo puedes escribir dentro de
-docs/specs/ (tus permisos no te dejan editar nada más).
+specs/ (tus permisos no te dejan editar nada más).
 
 ## Si te piden la spec 
 - Si la petición es ambigua, no supongas: devuelve solo una lista numerada de preguntas (máximo 5).
-- Con las respuestas, crea docs/specs/NNN-nombre/spec.md (NNN = siguiente número libre) con la plantilla
+- Con las respuestas, crea specs/NNN-nombre/spec.md (NNN = siguiente número libre) con la plantilla
 de la skill sdd, requisitos en EARS y "Estado: borrador".
 - Solo el QUÉ y el POR QUÉ: nada de stack, arquitectura ni archivos.
 
