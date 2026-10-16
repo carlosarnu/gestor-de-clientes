@@ -37,7 +37,8 @@ const {
   construirCeldas,
   construirFilas,
   dosDigitos,
-  importarClientes
+  importarClientes,
+  escaparAtributo
 } = require("./logica.js");
 
 // Ayuda: un formulario falso con la interfaz de FormData (.get)
@@ -578,4 +579,41 @@ test("dosDigitos rellena a dos cifras y está exportada (RF-1005)", () => {
   assert.equal(dosDigitos(9), "09");
   assert.equal(dosDigitos(10), "10");
   assert.equal(dosDigitos(27), "27");
+});
+
+// ===== Escape de atributos (corrección del reviewer, ronda 1) =====
+
+test("escaparAtributo conserva el texto completo con comillas y etiquetas (RF-1004)", () => {
+  assert.equal(
+    escaparAtributo('Nota con "comillas" y <b>etiqueta</b>.'),
+    "Nota con &quot;comillas&quot; y &lt;b&gt;etiqueta&lt;/b&gt;."
+  );
+});
+
+test("escaparAtributo neutraliza la inyección de atributos (reviewer)", () => {
+  const payload = 'x" onmouseover="window.__inyectado=1';
+  const salida = escaparAtributo(payload);
+  assert.equal(salida, "x&quot; onmouseover=&quot;window.__inyectado=1");
+  // Ni una comilla cruda: el atributo no puede cerrarse ni inyectar otros
+  assert.equal(salida.indexOf('"'), -1);
+});
+
+test("escaparAtributo escapa el «&» primero y sin doble escape", () => {
+  assert.equal(escaparAtributo('a & "b"'), "a &amp; &quot;b&quot;");
+  assert.equal(escaparAtributo("R&D < 5 && 6 > 2"), "R&amp;D &lt; 5 &amp;&amp; 6 &gt; 2");
+});
+
+test("escaparAtributo escapa comillas simples y trata vacíos/nulos como texto()", () => {
+  assert.equal(escaparAtributo("O'Connor"), "O&#39;Connor");
+  assert.equal(escaparAtributo(""), "");
+  assert.equal(escaparAtributo(null), "");
+  assert.equal(escaparAtributo(undefined), "");
+});
+
+test("escaparAtributo sobre una celda real de construirCeldas deja el valor sin comillas crudas (RF-1004/RF-1005)", () => {
+  const cliente = construirCliente(formulario({ empresa: "Vega", tipo: "Tela", notas: 'x" onmouseover="window.__inyectado=1' }), 1000, 1000);
+  const celda = construirCeldas(cliente, ["notas"], HOY)[0];
+  const pintado = escaparAtributo(celda.valor);
+  assert.equal(celda.valor, 'x" onmouseover="window.__inyectado=1'); // la lógica pura NO maquilla
+  assert.equal(pintado.indexOf('"'), -1); // el pintado en atributo, sí
 });

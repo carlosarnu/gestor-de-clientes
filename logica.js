@@ -9,6 +9,21 @@ function texto(valor) {
   return (valor || "").toString().trim();
 }
 
+// Escapa un valor para pintarlo SIEMPRE dentro de un atributo HTML: sustituye los
+// cinco caracteres que pueden romper el atributo o inyectar atributos ajenos
+// (& < > " '). El «&» va primero para no re-escapar las entidades resultantes.
+// Es transformación de texto plano (no construye markup): RF-1005 intacta.
+// Uso: todo atributo pintado con dato del usuario (p. ej. el `title` de las celdas
+// del listado y del mapa); escapar() de app.js solo sirve para CONTENIDO de texto.
+function escaparAtributo(valor) {
+  return texto(valor)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 // "Tela" -> "tela", "Espuma" -> "espuma", "Estructuras" -> "estructuras";
 // cualquier tipo escrito («Otros», spec 008) -> "otros"; sin tipo -> ""
 function claseTipo(tipo) {
@@ -387,6 +402,7 @@ if (typeof module !== "undefined" && module.exports) {
     nombreArchivoExportacion,
     importarClientes,
     dosDigitos,
+    escaparAtributo,
     CATALOGO_CAMPOS,
     normalizarSeleccion,
     alternarCampo,

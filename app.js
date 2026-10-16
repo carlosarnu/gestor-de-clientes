@@ -266,7 +266,7 @@ function pintarChips() {
     const marcado = camposSeleccionados.indexOf(campo.clave) !== -1;
     return '<button type="button" class="chip' + (marcado ? " marcado" : "") +
       '" role="checkbox" aria-checked="' + (marcado ? "true" : "false") +
-      '" data-campo="' + escapar(campo.clave) + '">' +
+      '" data-campo="' + escaparAtributo(campo.clave) + '">' +
       '<span class="chip-marca" aria-hidden="true">' + (marcado ? "✔" : "□") + "</span>" +
       escapar(campo.etiqueta) +
       "</button>";
@@ -624,15 +624,18 @@ function cuadroMapa(cliente) {
 
   if (modo === "enlace") {
     return '<div class="mapa-caja">' +
-      '<a class="mapa-enlace mapa-enlace-solo" href="' + escapar(enlace) +
+      '<a class="mapa-enlace mapa-enlace-solo" href="' + escaparAtributo(enlace) +
       '" target="_blank" rel="noopener">Ver en Google Maps</a>' +
     "</div>";
   }
 
+  // Los tres atributos del iframe/enlace se pintan con escaparAtributo: el `title`
+  // lleva la dirección del usuario (comillas incluidas) y los demás van por
+  // defensa en profundidad — aunque urlMapa/urlBusquedaMapa ya van codificados (reviewer)
   return '<div class="mapa-caja">' +
-    '<iframe class="mapa-mapa" title="Mapa de ' + escapar(direccion) + '" loading="lazy" ' +
-    'referrerpolicy="no-referrer-when-downgrade" src="' + escapar(urlMapa(direccion)) + '"></iframe>' +
-    '<a class="mapa-enlace" href="' + escapar(enlace) +
+    '<iframe class="mapa-mapa" title="Mapa de ' + escaparAtributo(direccion) + '" loading="lazy" ' +
+    'referrerpolicy="no-referrer-when-downgrade" src="' + escaparAtributo(urlMapa(direccion)) + '"></iframe>' +
+    '<a class="mapa-enlace" href="' + escaparAtributo(enlace) +
     '" target="_blank" rel="noopener">Ver en Google Maps</a>' +
   "</div>";
 }
@@ -656,7 +659,7 @@ function crearTablaListado(visibles) {
 
   // La cabecera usa las celdas de la primera fila: mismas columnas, mismo orden
   const cabecera = filas[0].celdas.map(function (celda) {
-    return '<th scope="col" title="' + escapar(celda.etiqueta) + '">' +
+    return '<th scope="col" title="' + escaparAtributo(celda.etiqueta) + '">' +
       escapar(celda.etiqueta) + "</th>";
   }).join("") + '<th scope="col" class="acciones-celda">Acciones</th>';
 
@@ -664,9 +667,12 @@ function crearTablaListado(visibles) {
   // cliente del turno da el color de su tipo; el data-id prepara las acciones (T-05)
   const cuerpo = filas.map(function (filaDatos, indice) {
     const celdas = filaDatos.celdas.map(function (celda) {
-      // Una sola línea cortada con «…» (title con el texto completo), RF-1004
-      return '<td data-etiqueta="' + escapar(celda.etiqueta) +
-        '" title="' + escapar(celda.valor) + '">' + escapar(celda.valor) + "</td>";
+      // Una sola línea cortada con «…» (title con el texto completo), RF-1004.
+      // El title es un ATRIBUTO: escaparAtributo (comillas incluidas) para que un
+      // valor con «"» no rompa el atributo ni inyecte atributos ajenos (reviewer);
+      // el contenido de la celda sigue con escapar() (contexto de texto).
+      return '<td data-etiqueta="' + escaparAtributo(celda.etiqueta) +
+        '" title="' + escaparAtributo(celda.valor) + '">' + escapar(celda.valor) + "</td>";
     }).join("");
     // La marca de edición cubre la fila entera (RF-1003), como en la tarjeta
     const editando = filaDatos.id === clienteEditandoId;

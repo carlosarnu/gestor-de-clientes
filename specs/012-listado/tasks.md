@@ -51,3 +51,9 @@
   - **Descripción:** `AGENTS.md` (funcionalidad 012), línea en `MEMORY.md` con el número de tests, marcar la spec/plan como implementados y commits por fases.
   - **RF:** RF-1005.
   - **Hecho cuando:** docs al día, `node --test` en verde y commits hechos. *(Hecho: 2026-10-16 — AGENTS.md con la entrada «Listado compacto (spec 012)» en «Funcionalidades implementadas»; `plan.md` en estado «aprobado e implementado»; MEMORY.md línea 012 cerrada como IMPLEMENTADA (59 tests, decisiones y commit) y «Próximos pasos» con 013/014/015; `node --check` OK y `node --test` → 59/59; commits hechos y árbol limpio)*
+
+---
+
+## Corrección posterior (ronda 1 del reviewer, 2026-10-16)
+
+- **RF-1004 — `title` de las celdas y del mapa sin escapar comillas** (bloqueante): `escapar()` de `app.js` (textContent/innerHTML) no escapa `"`/`'`, así que un valor con comillas rompía el atributo `title` y permitía **inyectar atributos** (p. ej. notas `x" onmouseover="…`, demostrado). **Arreglo:** nueva ayuda pura **`escaparAtributo()` en `logica.js`** (escapa `& < > " '`, exportada, RF-1005 intacta) + **5 tests** nuevos en `test-logica.js` (título con comillas íntegro, payload neutralizado, `&` primero, comillas simples, nulos) y uso en **todos los contextos de atributo** de `app.js` (celdas y cabecera del listado `title`/`data-etiqueta`, título del iframe del mapa —corrección secundaria heredada de la 004—, `href`/`src` y `data-campo` por defensa en profundidad); el contenido de texto sigue con `escapar()`. Verificado en navegador: title íntegro con `"` y `<b>`, payload importado → 2 atributos, sin `onmouseover`, `window.__inyectado` indefinido tras `mouseover` real, dirección `C/ "Los Olivos" 3` → título del mapa íntegro, 375 sin desbordes, consola limpia, datos borrados. **64/64 tests.** Commit: «Spec 012-listado: corrige title de celdas y tarjeta — escape de atributos (reviewer)».

@@ -82,7 +82,7 @@
 
 ## 8. Verificación
 
-- `node --check logica.js app.js` + **`node --test` en verde** con los tests nuevos (hoy 41), **sin DOM**.
+- `node --check logica.js app.js` + **`node --test` en verde** con los tests nuevos (hoy 64), **sin DOM**.
 - **Chrome DevTools** (abriendo `index.html`):
   - Conmutador: «Listado» pinta filas en el mismo clic y «Tarjetas» recupera el aspecto anterior; filtro, búsqueda y orden intactos.
   - Chips: marcar/desmarcar actualiza al instante; desmarcar el último vuelve a «solo Empresa» sin error.
