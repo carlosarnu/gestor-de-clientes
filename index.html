@@ -96,6 +96,14 @@
     <section class="panel">
       <div class="lista-cabecera">
         <h2>Clientes</h2>
+
+        <!-- Conmutador de vista (spec 012, RF-1001): «Tarjetas» activo por defecto;
+             el estado (vistaActual) vive solo en memoria, sin persistencia -->
+        <div class="conmutador" id="conmutador" role="group" aria-label="Forma de ver la lista">
+          <button type="button" class="activo" data-vista="tarjetas" aria-pressed="true">Tarjetas</button>
+          <button type="button" data-vista="listado" aria-pressed="false">Listado</button>
+        </div>
+
         <p class="contador" id="contador"></p>
       </div>
 
@@ -126,6 +134,13 @@
         <p class="confirmacion-importacion-texto" id="confirmacion-importacion-texto"></p>
         <button type="button" class="boton-secundario boton-reemplazar" id="boton-reemplazar">Sí, reemplazar</button>
         <button type="button" class="boton-secundario" id="boton-cancelar-importacion">Cancelar</button>
+      </div>
+
+      <!-- Selector de campos del listado (spec 012, RF-1002): chips con estado de
+           casilla, generados desde CATALOGO_CAMPOS; oculto en vista «Tarjetas» -->
+      <div class="selector-campos" id="selector-campos" hidden>
+        <p class="selector-campos-titulo" id="selector-campos-titulo">Campos del listado</p>
+        <div class="chips" id="chips" role="group" aria-labelledby="selector-campos-titulo"></div>
       </div>
 
       <div class="lista-clientes" id="lista-clientes"></div>

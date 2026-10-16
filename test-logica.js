@@ -5,6 +5,8 @@
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 
 const {
   texto,
@@ -28,6 +30,13 @@ const {
   esTipoFijo,
   migrarTipos,
   nombreArchivoExportacion,
+  CATALOGO_CAMPOS,
+  normalizarSeleccion,
+  alternarCampo,
+  fechaTextoLocal,
+  construirCeldas,
+  construirFilas,
+  dosDigitos,
   importarClientes
 } = require("./logica.js");
 
@@ -407,4 +416,166 @@ test("importarClientes migra «FOAM» a «Espuma» y conserva id y fecha válido
 test("importarClientes con lista vacía devuelve lista vacía sin error (RF-905)", () => {
   const resultado = importarClientes("[]");
   assert.deepEqual(resultado, { clientes: [], error: null });
+});
+
+// ===== listado compacto con selector de campos (spec 012) =====
+
+// Reloj inyectado en las pruebas de fecha: 16/10/2026 a las 12:00 (hora local)
+const HOY = new Date(2026, 9, 16, 12, 0, 0);
+
+// Cliente sin ningún dato, para las convenciones de celdas (RF-1004)
+const CLIENTE_SIN_DATOS = {
+  id: 7,
+  fecha: new Date(2026, 9, 10, 8, 30).getTime(),
+  empresa: "", cif: "", contacto: "", telefono: "", movil: "",
+  email: "", direccion: "", codigoPostal: "", tipo: "", notas: ""
+};
+
+test("CATALOGO_CAMPOS lista los 11 campos en orden de formulario con «Fecha de alta» al final (RF-1002/RF-1005)", () => {
+  assert.equal(CATALOGO_CAMPOS.length, 11);
+  assert.deepEqual(CATALOGO_CAMPOS.map(c => c.clave), [
+    "empresa", "cif", "contacto", "telefono", "movil", "email",
+    "direccion", "codigoPostal", "tipo", "notas", "fecha"
+  ]);
+  assert.deepEqual(CATALOGO_CAMPOS.map(c => c.etiqueta), [
+    "Empresa", "CIF", "Contacto", "Teléfono", "Móvil", "Correo electrónico",
+    "Dirección", "Código postal", "Tipo", "Notas", "Fecha de alta"
+  ]);
+  // el id nunca se ofrece y ninguna clave se repite
+  assert.equal(CATALOGO_CAMPOS.some(c => c.clave === "id"), false);
+  assert.equal(new Set(CATALOGO_CAMPOS.map(c => c.clave)).size, 11);
+});
+
+test("normalizarSeleccion descarta claves fuera del catálogo y respeta su orden (RF-1005)", () => {
+  assert.deepEqual(normalizarSeleccion(["notas", "empresa"]), ["empresa", "notas"]);
+  assert.deepEqual(normalizarSeleccion(["tipo", "cif"]), ["cif", "tipo"]);
+  assert.deepEqual(normalizarSeleccion(["id", "provincia", "empresa"]), ["empresa"]);
+});
+
+test("normalizarSeleccion quita las claves duplicadas (RF-1005)", () => {
+  assert.deepEqual(normalizarSeleccion(["empresa", "empresa", "cif", "empresa"]), ["empresa", "cif"]);
+});
+
+test("normalizarSeleccion con selección vacía o inválida vuelve a «solo Empresa» (RF-1002/RF-1005)", () => {
+  assert.deepEqual(normalizarSeleccion([]), ["empresa"]);
+  assert.deepEqual(normalizarSeleccion(["id", "loquesea", ""]), ["empresa"]);
+  assert.deepEqual(normalizarSeleccion(undefined), ["empresa"]);
+  assert.deepEqual(normalizarSeleccion(null), ["empresa"]);
+});
+
+test("alternarCampo marca y desmarca sin mutar la selección original (RF-1002)", () => {
+  const seleccion = ["empresa"];
+  const conCif = alternarCampo(seleccion, "cif");
+  assert.deepEqual(conCif, ["empresa", "cif"]);
+  assert.deepEqual(seleccion, ["empresa"]); // la entrada no se toca
+  assert.deepEqual(alternarCampo(conCif, "cif"), ["empresa"]); // vuelve a desmarcar
+});
+
+test("alternarCampo devuelve la selección en orden del catálogo (RF-1002/RF-1005)", () => {
+  assert.deepEqual(alternarCampo(["empresa"], "tipo"), ["empresa", "tipo"]);
+  assert.deepEqual(alternarCampo(["empresa", "tipo"], "cif"), ["empresa", "cif", "tipo"]);
+});
+
+test("alternarCampo al desmarcar el último campo vuelve a «solo Empresa» sin error (RF-1002)", () => {
+  assert.deepEqual(alternarCampo(["empresa"], "empresa"), ["empresa"]);
+  assert.deepEqual(alternarCampo(["tipo"], "tipo"), ["empresa"]);
+  assert.deepEqual(alternarCampo(["empresa", "cif"], "cif"), ["empresa"]);
+});
+
+test("alternarCampo ignora las claves fuera del catálogo (RF-1002/RF-1005)", () => {
+  assert.deepEqual(alternarCampo(["empresa"], "id"), ["empresa"]);
+  assert.deepEqual(alternarCampo(["empresa"], "loquesea"), ["empresa"]);
+});
+
+test("fechaTextoLocal devuelve dd/mm/aaaa con ceros en la fecha local (RF-1005)", () => {
+  assert.equal(fechaTextoLocal(new Date(2026, 2, 5, 9, 15).getTime(), HOY), "05/03/2026");
+  assert.equal(fechaTextoLocal(new Date(2025, 11, 31, 23, 59).getTime(), HOY), "31/12/2025");
+  assert.equal(fechaTextoLocal(HOY.getTime(), HOY), "16/10/2026"); // hoy mismo también es válida
+  // el reloj puede inyectarse como Date (plan) o como epoch en milisegundos
+  assert.equal(fechaTextoLocal(new Date(2026, 0, 5).getTime(), new Date(2026, 5, 1).getTime()), "05/01/2026");
+});
+
+test("fechaTextoLocal con alta tras la medianoche muestra el día LOCAL, no el de UTC (RF-1002/RF-1005)", () => {
+  // 00:30 del día 1: con toISOString el día se desplazaría según la zona horaria
+  assert.equal(fechaTextoLocal(new Date(2026, 0, 1, 0, 30).getTime(), HOY), "01/01/2026");
+  assert.equal(fechaTextoLocal(new Date(2026, 5, 30, 0, 0, 1).getTime(), HOY), "30/06/2026");
+});
+
+test("fechaTextoLocal admite cualquier hora de mañana y rechaza desde pasado mañana (RF-1005, decisión del usuario 2026-10-16)", () => {
+  // mañana (17/10) a cualquier hora: válida, aunque sea de madrugada
+  assert.equal(fechaTextoLocal(new Date(2026, 9, 17, 0, 30).getTime(), HOY), "17/10/2026");
+  assert.equal(fechaTextoLocal(new Date(2026, 9, 17, 23, 59).getTime(), HOY), "17/10/2026");
+  // pasado mañana (18/10): «—», incluido el primer segundo del día
+  assert.equal(fechaTextoLocal(new Date(2026, 9, 18).getTime(), HOY), "");
+  assert.equal(fechaTextoLocal(new Date(2026, 9, 18, 0, 30).getTime(), HOY), "");
+  assert.equal(fechaTextoLocal(new Date(2026, 9, 18, 9, 0).getTime(), HOY), "");
+  assert.equal(fechaTextoLocal(new Date(2030, 0, 1).getTime(), HOY), "");
+});
+
+test("fechaTextoLocal con fecha no numérica devuelve cadena vacía (RF-1005)", () => {
+  assert.equal(fechaTextoLocal("ayer", HOY), "");
+  assert.equal(fechaTextoLocal(NaN, HOY), "");
+  assert.equal(fechaTextoLocal(Infinity, HOY), "");
+  assert.equal(fechaTextoLocal(null, HOY), "");
+  assert.equal(fechaTextoLocal(undefined, HOY), "");
+  assert.equal(fechaTextoLocal({}, HOY), "");
+});
+
+test("fechaTextoLocal no usa toISOString, fechas de texto ni días en milisegundos (RF-1005, skill local-dates)", () => {
+  // revisión de la fuente de logica.js: prohibido el día en UTC y los días fijos
+  const fuente = fs.readFileSync(path.join(__dirname, "logica.js"), "utf8");
+  assert.equal(/\.toISOString\(/.test(fuente), false);
+  assert.equal(/new Date\(\s*["']/.test(fuente), false);
+  assert.equal(/86400000/.test(fuente), false);
+});
+
+test("construirCeldas devuelve etiqueta y valor por celda elegida, en orden del catálogo y sin HTML (RF-1004/RF-1005)", () => {
+  const celdas = construirCeldas(CLIENTE_V1, ["email", "empresa"], HOY);
+  assert.deepEqual(celdas, [
+    { clave: "empresa", etiqueta: "Empresa", valor: "Textiles Norte" },
+    { clave: "email", etiqueta: "Correo electrónico", valor: "ana@textilesnorte.es" }
+  ]);
+  // los datos llegan crudos: el escapado lo hace app.js al pintar, aquí no hay marcas
+  const conNotas = Object.assign({}, CLIENTE_V1, { notas: "<b>urgente</b>" });
+  assert.equal(construirCeldas(conNotas, ["notas"], HOY)[0].valor, "<b>urgente</b>");
+  // una clave fuera del catálogo no genera columna
+  assert.equal(construirCeldas(CLIENTE_V1, ["id", "empresa"], HOY).length, 1);
+});
+
+test("construirCeldas aplica las convenciones de celdas vacías (RF-1004)", () => {
+  const celdas = construirCeldas(CLIENTE_SIN_DATOS, ["empresa", "tipo", "telefono", "notas", "fecha"], HOY);
+  // en orden del catálogo: Teléfono (4.º) va antes que Tipo (9.º)
+  assert.deepEqual(celdas.map(c => c.clave), ["empresa", "telefono", "tipo", "notas", "fecha"]);
+  assert.deepEqual(celdas.map(c => c.valor), ["Sin nombre", "—", "Sin tipo", "—", "10/10/2026"]);
+  // tipo libre (spec 008): se muestra su texto
+  const toldos = Object.assign({}, CLIENTE_SIN_DATOS, { tipo: "Toldos" });
+  assert.equal(construirCeldas(toldos, ["tipo"], HOY)[0].valor, "Toldos");
+  // fecha ausente o inválida: «—» sin romper el listado
+  const sinFecha = Object.assign({}, CLIENTE_SIN_DATOS, { fecha: "ayer" });
+  assert.equal(construirCeldas(sinFecha, ["fecha"], HOY)[0].valor, "—");
+});
+
+test("construirFilas conserva número, orden e id de la lista de entrada (RF-1003/RF-1005)", () => {
+  const filas = construirFilas(LISTA, ["empresa", "tipo"], HOY);
+  assert.equal(filas.length, 3);
+  assert.deepEqual(filas.map(f => f.id), [1001, 1002, 1003]);
+  assert.deepEqual(filas[1], {
+    id: 1002,
+    celdas: [
+      { clave: "empresa", etiqueta: "Empresa", valor: "Asientos Vega" },
+      { clave: "tipo", etiqueta: "Tipo", valor: "Espuma" }
+    ]
+  });
+});
+
+test("construirFilas con lista vacía devuelve vacío (RF-1005)", () => {
+  assert.deepEqual(construirFilas([], ["empresa"], HOY), []);
+});
+
+test("dosDigitos rellena a dos cifras y está exportada (RF-1005)", () => {
+  assert.equal(dosDigitos(0), "00");
+  assert.equal(dosDigitos(5), "05");
+  assert.equal(dosDigitos(9), "09");
+  assert.equal(dosDigitos(10), "10");
+  assert.equal(dosDigitos(27), "27");
 });

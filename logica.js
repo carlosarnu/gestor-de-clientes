@@ -265,6 +265,101 @@ function importarClientes(textoJson) {
   return { clientes: migrarTipos(clientes), error: null };
 }
 
+// =====================================================
+// Listado compacto con selector de campos (spec 012)
+// =====================================================
+
+// Único catálogo de campos elegibles en el listado (RF-1002): de él penden tanto el
+// selector de chips como el orden de las columnas. Orden = orden del formulario con
+// «Fecha de alta» al final (es un dato de alta, no del formulario); `id` nunca se
+// ofrece. Pensado para ampliarse con «Provincia» (spec 015) y «Tipo» múltiple (014).
+const CATALOGO_CAMPOS = [
+  { clave: "empresa", etiqueta: "Empresa" },
+  { clave: "cif", etiqueta: "CIF" },
+  { clave: "contacto", etiqueta: "Contacto" },
+  { clave: "telefono", etiqueta: "Teléfono" },
+  { clave: "movil", etiqueta: "Móvil" },
+  { clave: "email", etiqueta: "Correo electrónico" },
+  { clave: "direccion", etiqueta: "Dirección" },
+  { clave: "codigoPostal", etiqueta: "Código postal" },
+  { clave: "tipo", etiqueta: "Tipo" },
+  { clave: "notas", etiqueta: "Notas" },
+  { clave: "fecha", etiqueta: "Fecha de alta" }
+];
+
+// Selección válida de campos (RF-1002): claves que estén en el catálogo, sin
+// duplicados y en el orden del catálogo; si no queda ninguna (o no viene array)
+// → ["empresa"], la vista por defecto, sin errores.
+function normalizarSeleccion(claves) {
+  const pedidas = Array.isArray(claves) ? claves : [];
+  const seleccion = CATALOGO_CAMPOS
+    .map(function (campo) {
+      return campo.clave;
+    })
+    .filter(function (clave) {
+      return pedidas.indexOf(clave) !== -1;
+    });
+  return seleccion.length > 0 ? seleccion : ["empresa"];
+}
+
+// Selección NUEVA con la clave alternada (marcada si no lo estaba, desmarcada si lo
+// estaba), normalizada: si al desmarcar la última no queda nada, vuelve a «solo
+// Empresa» automáticamente (Decisión 3 de la spec, sin mensajes de error).
+function alternarCampo(seleccion, clave) {
+  const actual = normalizarSeleccion(seleccion);
+  const siguiente = actual.indexOf(clave) !== -1
+    ? actual.filter(function (c) { return c !== clave; })
+    : actual.concat([clave]); // una clave desconocida la descartará la normalización
+  return normalizarSeleccion(siguiente);
+}
+
+// Texto local "dd/mm/aaaa" de la fecha de alta (RF-1002): métodos LOCALES del Date
+// (nunca toISOString, que daría el día en UTC) rellenando con dosDigitos().
+// `hoy` es el reloj inyectado (Date o epoch en ms) para tests deterministas.
+// Fecha inválida (no numérica o de pasado mañana en adelante — decisión del usuario
+// 2026-10-16: cualquier hora de mañana vale) → "" → la celda pintará «—».
+function fechaTextoLocal(fecha, hoy) {
+  if (!esNumero(fecha)) return "";
+  const reloj = hoy instanceof Date ? hoy : new Date(hoy);
+  // Límite = inicio del día de pasado mañana (00:00 hora local) con el constructor
+  // local del Date, nunca toISOString ni días en milisegundos (skill local-dates)
+  const limite = new Date(reloj.getFullYear(), reloj.getMonth(), reloj.getDate() + 2);
+  if (fecha >= limite.getTime()) return "";
+  const alta = new Date(fecha);
+  return (
+    dosDigitos(alta.getDate()) +
+    "/" + dosDigitos(alta.getMonth() + 1) +
+    "/" + alta.getFullYear()
+  );
+}
+
+// Datos de las celdas de un cliente para las columnas elegidas: [{ clave, etiqueta,
+// valor }], solo datos y sin HTML (el escapado y el título emergente los pinta
+// app.js, RF-1005). Convenciones de la Decisión 6: empresa vacía → «Sin nombre»,
+// tipo → nombreTipo («Sin tipo» o el texto libre de la 008), fecha → dd/mm/aaaa
+// local y el resto de celdas → «—»; ninguna celda queda en blanco.
+function construirCeldas(cliente, campos, hoy) {
+  return normalizarSeleccion(campos).map(function (clave) {
+    const campo = CATALOGO_CAMPOS.find(function (c) {
+      return c.clave === clave;
+    });
+    let valor;
+    if (clave === "empresa") valor = texto(cliente.empresa) || "Sin nombre";
+    else if (clave === "tipo") valor = nombreTipo(cliente.tipo);
+    else if (clave === "fecha") valor = fechaTextoLocal(cliente.fecha, hoy) || "—";
+    else valor = texto(cliente[clave]) || "—";
+    return { clave: campo.clave, etiqueta: campo.etiqueta, valor: valor };
+  });
+}
+
+// Filas del listado: [{ id, celdas }] conservando el orden de la lista de entrada
+// (más reciente primero, RF-1003).
+function construirFilas(clientes, campos, hoy) {
+  return clientes.map(function (cliente) {
+    return { id: cliente.id, celdas: construirCeldas(cliente, campos, hoy) };
+  });
+}
+
 // En Node (tests) exportamos las funciones; en el navegador no existe `module` y se omite.
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
@@ -290,6 +385,13 @@ if (typeof module !== "undefined" && module.exports) {
     esTipoFijo,
     migrarTipos,
     nombreArchivoExportacion,
-    importarClientes
+    importarClientes,
+    dosDigitos,
+    CATALOGO_CAMPOS,
+    normalizarSeleccion,
+    alternarCampo,
+    fechaTextoLocal,
+    construirCeldas,
+    construirFilas
   };
 }

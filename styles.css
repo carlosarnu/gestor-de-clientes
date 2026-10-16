@@ -197,9 +197,10 @@ h2 {
 
 .lista-cabecera {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px 12px;
   margin-bottom: 12px;
 }
 
@@ -289,6 +290,120 @@ h2 {
   margin: 0;
   font-size: 0.875rem;
   color: var(--tinta-suave);
+}
+
+/* ===== Conmutador de vista y selector de campos (spec 012) ===== */
+
+/* Control segmentado «Tarjetas | Listado» en la cabecera de la lista (RF-1001) */
+.conmutador {
+  display: inline-flex;
+  border: 1px solid var(--linea);
+  border-radius: 999px;
+  background: var(--superficie);
+}
+
+.conmutador button {
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  min-height: 44px; /* objetivo táctil */
+  padding: 11px 16px;
+  border: none;
+  background: transparent;
+  color: var(--tinta-media);
+  cursor: pointer;
+}
+
+.conmutador button:first-child {
+  border-radius: 999px 0 0 999px;
+}
+
+.conmutador button:last-child {
+  border-radius: 0 999px 999px 0;
+  border-left: 1px solid var(--linea);
+}
+
+.conmutador button:hover {
+  background: var(--linea-suave);
+}
+
+/* Estado activo: relleno en tinta + texto en negrita (se distingue sin depender
+   solo del color, igual que el resto de estados de la app) */
+.conmutador .vista-activa {
+  background: var(--tinta);
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.conmutador .vista-activa:hover {
+  background: var(--tinta);
+}
+
+.conmutador button:focus-visible,
+.chip:focus-visible {
+  outline: 2px solid var(--tinta);
+  outline-offset: 2px;
+}
+
+/* Selector de campos: solo visible en el modo listado (el hidden lo alterna app.js) */
+.selector-campos {
+  margin-bottom: 16px;
+}
+
+.selector-campos[hidden] {
+  display: none;
+}
+
+.selector-campos-titulo {
+  margin: 0 0 8px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--tinta-media);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Chip: botón real con estado de casilla (role=checkbox + aria-checked en app.js);
+   la casilla «✔ / □» es el estado visible, no solo el color (RF-1002/RF-1004) */
+.chip {
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px; /* objetivo táctil */
+  padding: 11px 16px;
+  border: 1px solid var(--linea);
+  border-radius: 999px;
+  background: var(--superficie);
+  color: var(--tinta-media);
+  cursor: pointer;
+}
+
+.chip:hover {
+  background: var(--linea-suave);
+}
+
+.chip-marca {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+/* Marcado: relleno en tinta, como la pestaña de filtro activa */
+.chip.marcado {
+  background: var(--tinta);
+  border-color: var(--tinta);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.chip.marcado:hover {
+  background: #2e3830;
 }
 
 /* ===== Copia de seguridad (spec 011, RF-901) ===== */
@@ -571,6 +686,199 @@ h2 {
   border: 1px dashed var(--linea);
   border-radius: 8px;
   margin: 0;
+}
+
+/* ===== Listado compacto (spec 012, RF-1004) ===== */
+
+/* La tabla ocupa el ancho completo aunque .lista-clientes sea rejilla de tarjetas */
+.listado {
+  grid-column: 1 / -1;
+  width: 100%;
+  /* min-width: 0 = ítem de rejilla sin tamaño intrínseco: el texto en nowrap de
+     las celdas no empuja la tabla (sin esto hay scroll horizontal en móvil) */
+  min-width: 0;
+  border-collapse: collapse;
+  table-layout: fixed; /* columnas iguales: las celdas de texto cortan con «…» */
+  background: var(--superficie);
+  border: 1px solid var(--linea);
+  border-radius: 8px;
+}
+
+.listado th {
+  text-align: left;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--tinta-media);
+  padding: 10px 12px;
+  border-bottom: 2px solid var(--linea);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.listado td {
+  font-size: 0.9rem;
+  color: var(--tinta);
+  padding: 11px 12px; /* fila de ≈ 46 px: objetivo táctil */
+  border-bottom: 1px solid var(--linea-suave);
+  /* Una sola línea cortada con «…»; el texto completo está en title (RF-1004) */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Canto de color por fila, mismo criterio que las tarjetas (Decisión 7) */
+.listado .fila {
+  border-left: 6px solid var(--linea);
+}
+
+.listado .fila-tela {
+  border-left-color: var(--tela);
+}
+
+.listado .fila-espuma {
+  border-left-color: var(--espuma);
+}
+
+.listado .fila-estructuras {
+  border-left-color: var(--estructuras);
+}
+
+.listado .fila-otros {
+  border-left-color: var(--otros);
+}
+
+.listado tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Las filas no son accionables todavía (acciones en T-05): sin aspecto clicable */
+.listado .fila {
+  cursor: default;
+}
+
+/* ===== Acciones en la fila (spec 012, RF-1003) ===== */
+
+/* La celda de acciones nunca corta con «…»: crece con sus botones */
+.listado .acciones-celda {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+/* La columna de acciones tiene ancho propio para que «Editar» y «Eliminar»
+   queeden en fila (con table-layout: fixed el ancho lo da la cabecera) */
+.listado th.acciones-celda {
+  width: 190px;
+}
+
+.acciones-fila {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Mismos botones que la tarjeta (.boton-tarjeta) reutilizados dentro de la celda */
+.acciones-fila .boton-tarjeta {
+  flex: 1 1 0;
+  min-width: 70px;
+}
+
+/* «¿Seguro? · Sí, eliminar / No» dentro de la celda (mismo estilo que la tarjeta) */
+.acciones-celda .confirmacion {
+  margin: 0;
+  padding: 0;
+  border-top: none;
+}
+
+/* Marca de edición en la fila ENTERA (RF-1003): bordes en tinta arriba/abajo/
+   derecha como .tarjeta.editando; el canto de color se conserva a la izquierda
+   (Decisión 7) y el resaltado lo da un tinte suave de tinta (sin sombras) */
+.listado .fila.editando td {
+  border-top: 2px solid var(--tinta);
+  border-bottom: 2px solid var(--tinta);
+  background: rgba(29, 36, 31, 0.05);
+}
+
+.listado .fila.editando td:last-child {
+  border-right: 2px solid var(--tinta);
+}
+
+/* Móvil: filas apiladas etiqueta+valor, sin scroll horizontal (RF-1004) */
+@media (max-width: 768px) {
+  .listado,
+  .listado tbody,
+  .listado tr,
+  .listado td {
+    display: block;
+    width: auto;
+  }
+
+  /* La cabecera se conserva para lectores de pantalla, pero visualmente cada
+     celda lleva su etiqueta (data-etiqueta) sobre el valor */
+  .listado thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .listado {
+    border: none;
+  }
+
+  .listado tr {
+    margin-bottom: 10px;
+    background: var(--superficie);
+    border: 1px solid var(--linea);
+    border-left: 6px solid var(--linea);
+    border-radius: 8px;
+  }
+
+  .listado td {
+    display: block;
+    padding: 8px 12px;
+    border-bottom: 1px dashed var(--linea-suave);
+  }
+
+  .listado td::before {
+    content: attr(data-etiqueta);
+    display: block;
+    margin-bottom: 2px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--tinta-media);
+  }
+
+  /* La celda de acciones no lleva etiqueta (sus botones se explican solos) */
+  .listado .acciones-celda::before {
+    content: none;
+  }
+
+  /* En bloque, la marca de edición rodea la fila entera (la tarjeta-fila),
+     no celda a celda; el canto de color del tipo se conserva como en .tarjeta */
+  .listado .fila.editando {
+    border-top-color: var(--tinta);
+    border-right-color: var(--tinta);
+    border-bottom-color: var(--tinta);
+  }
+
+  .listado .fila.editando td {
+    border-top: none;
+    border-bottom: 1px dashed var(--linea-suave);
+    background: transparent;
+  }
+
+  .listado .fila.editando td:last-child {
+    border-right: none;
+    border-bottom: none;
+  }
+
+  .listado tbody tr:last-child td,
+  .listado td:last-child {
+    border-bottom: none;
+  }
 }
 
 /* ===== Aviso tipo toast ===== */

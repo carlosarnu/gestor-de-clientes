@@ -32,6 +32,11 @@ const textoConfirmacionImportar = document.getElementById("confirmacion-importac
 const botonReemplazar = document.getElementById("boton-reemplazar");
 const botonCancelarImportacion = document.getElementById("boton-cancelar-importacion");
 
+// Conmutador de vista y selector de campos (spec 012, RF-1001/RF-1002)
+const conmutador = document.getElementById("conmutador");
+const selectorCampos = document.getElementById("selector-campos");
+const contenedorChips = document.getElementById("chips");
+
 // Estado de la aplicación
 // ¿Existía el archivo de datos al arrancar? Solo tiene sentido en escritorio:
 // sirve para el mensaje de migración en 2 clics (spec 011, RF-903). Se declara
@@ -40,6 +45,10 @@ let archivoInicialExiste = false;
 let clientes = cargarClientes();
 let filtroActivo = "Todos";
 let textoBusqueda = ""; // texto del buscador (spec 005)
+// Vista actual y campos elegidos del listado (spec 012): SOLO en memoria, sin
+// persistencia — al recargar se vuelve a «Tarjetas» con solo «Empresa» (RF-1006)
+let vistaActual = "tarjetas"; // "tarjetas" (por defecto) o "listado"
+let camposSeleccionados = normalizarSeleccion(["empresa"]); // 1 campo por defecto
 let clienteEditandoId = null; // id del cliente en edición, o null si no se está editando
 let confirmandoEliminarId = null; // id de la tarjeta mostrando "¿Seguro?", o null si no hay ninguna
 let importacionPendiente = null; // clientes del fichero esperando confirmación, o null
@@ -205,6 +214,63 @@ function pintarFiltros() {
   botones.forEach(function (boton) {
     boton.classList.toggle("activo", boton.dataset.filtro === filtroActivo);
   });
+}
+
+// =====================================================
+// Conmutador de vista y selector de campos (spec 012, RF-1001/RF-1002)
+// =====================================================
+
+// Cambia la vista al instante sin tocar datos, filtro, búsqueda ni orden.
+// El estado vive solo en memoria: no se escribe nada (RF-1006).
+conmutador.addEventListener("click", function (evento) {
+  const boton = evento.target.closest("[data-vista]");
+  if (!boton) return;
+
+  vistaActual = boton.dataset.vista;
+  pintarConmutador();
+  pintarLista();
+});
+
+function pintarConmutador() {
+  const botones = conmutador.querySelectorAll("[data-vista]");
+  botones.forEach(function (boton) {
+    const activa = boton.dataset.vista === vistaActual;
+    boton.classList.toggle("vista-activa", activa);
+    boton.setAttribute("aria-pressed", activa ? "true" : "false");
+  });
+  // El selector de chips solo se enseña en el modo listado (Decisión 2 de la spec)
+  selectorCampos.hidden = vistaActual !== "listado";
+}
+
+// Clic en un chip: alterna el campo en la selección y repinta chips Y filas
+// (las columnas del listado cambian al instante, RF-1002)
+contenedorChips.addEventListener("click", function (evento) {
+  const chip = evento.target.closest(".chip");
+  if (!chip) return;
+
+  const campo = chip.dataset.campo;
+  camposSeleccionados = alternarCampo(camposSeleccionados, campo);
+  pintarChips();
+  pintarLista();
+
+  // pintarChips() reconstruye los botones: devolvemos el foco al mismo chip para
+  // que Intro/Espacio seguidos sigan alternando ese campo (RF-1004)
+  const chipRepintado = contenedorChips.querySelector('.chip[data-campo="' + campo + '"]');
+  if (chipRepintado) chipRepintado.focus();
+});
+
+// Chips generados desde CATALOGO_CAMPOS (el único catálogo, RF-1002): casilla
+// marcada/desmarcada con estado visible «✔/□», no exclusivos, en español
+function pintarChips() {
+  contenedorChips.innerHTML = CATALOGO_CAMPOS.map(function (campo) {
+    const marcado = camposSeleccionados.indexOf(campo.clave) !== -1;
+    return '<button type="button" class="chip' + (marcado ? " marcado" : "") +
+      '" role="checkbox" aria-checked="' + (marcado ? "true" : "false") +
+      '" data-campo="' + escapar(campo.clave) + '">' +
+      '<span class="chip-marca" aria-hidden="true">' + (marcado ? "✔" : "□") + "</span>" +
+      escapar(campo.etiqueta) +
+      "</button>";
+  }).join("");
 }
 
 // =====================================================
@@ -488,6 +554,13 @@ function pintarLista() {
     return;
   }
 
+  // Vista de listado (spec 012, RF-1003): mismos visibles, orden y contador que
+  // las tarjetas; los estados vacíos de arriba son comunes a las dos vistas
+  if (vistaActual === "listado") {
+    listaClientes.innerHTML = crearTablaListado(visibles);
+    return;
+  }
+
   // Pintamos las tarjetas
   listaClientes.innerHTML = visibles.map(crearTarjeta).join("");
 }
@@ -570,6 +643,65 @@ function fila(etiqueta, valor) {
 }
 
 // =====================================================
+// Listado compacto: filas (spec 012, RF-1003/RF-1004)
+// =====================================================
+
+// Tabla del listado: cabecera con las etiquetas de los campos elegidos y una fila
+// por cliente. Los valores vienen de la lógica pura (construirFilas) con las
+// convenciones de siempre («Sin nombre»/«Sin tipo»/«—»/tipo libre) y la fecha ya
+// en dd/mm/aaaa local: aquí solo se escapa y se pinta. Sin mapa ni iframes (RF-1004).
+function crearTablaListado(visibles) {
+  const hoy = new Date();
+  const filas = construirFilas(visibles, camposSeleccionados, hoy);
+
+  // La cabecera usa las celdas de la primera fila: mismas columnas, mismo orden
+  const cabecera = filas[0].celdas.map(function (celda) {
+    return '<th scope="col" title="' + escapar(celda.etiqueta) + '">' +
+      escapar(celda.etiqueta) + "</th>";
+  }).join("") + '<th scope="col" class="acciones-celda">Acciones</th>';
+
+  // filas y visibles van en el mismo orden (construirFilas lo garantiza): el
+  // cliente del turno da el color de su tipo; el data-id prepara las acciones (T-05)
+  const cuerpo = filas.map(function (filaDatos, indice) {
+    const celdas = filaDatos.celdas.map(function (celda) {
+      // Una sola línea cortada con «…» (title con el texto completo), RF-1004
+      return '<td data-etiqueta="' + escapar(celda.etiqueta) +
+        '" title="' + escapar(celda.valor) + '">' + escapar(celda.valor) + "</td>";
+    }).join("");
+    // La marca de edición cubre la fila entera (RF-1003), como en la tarjeta
+    const editando = filaDatos.id === clienteEditandoId;
+    return '<tr class="fila fila-' + claseTipo(visibles[indice].tipo) +
+      (editando ? " editando" : "") + '" data-id="' + filaDatos.id + '">' +
+      celdas + accionesFila(filaDatos.id) + "</tr>";
+  }).join("");
+
+  return '<table class="listado">' +
+    "<thead><tr>" + cabecera + "</tr></thead>" +
+    "<tbody>" + cuerpo + "</tbody>" +
+  "</table>";
+}
+
+// Acciones de la fila (spec 012, RF-1003): réplica del pie de la tarjeta con los
+// MISMOS data-accion/data-id, así el listener delegado de #lista-clientes las
+// atiende igual («editar», «eliminar», «confirmar-si», «confirmar-no»). Nunca
+// conviven botones y «¿Seguro?» en la misma celda.
+function accionesFila(id) {
+  const confirmando = confirmandoEliminarId === id;
+
+  const contenido = confirmando
+    ? '<div class="confirmacion">¿Seguro?' +
+        '<button type="button" class="boton-tarjeta boton-si" data-accion="confirmar-si" data-id="' + id + '">Sí, eliminar</button>' +
+        '<button type="button" class="boton-tarjeta boton-no" data-accion="confirmar-no" data-id="' + id + '">No</button>' +
+      "</div>"
+    : '<div class="acciones-fila">' +
+        '<button type="button" class="boton-tarjeta boton-editar" data-accion="editar" data-id="' + id + '">Editar</button>' +
+        '<button type="button" class="boton-tarjeta boton-eliminar" data-accion="eliminar" data-id="' + id + '">Eliminar</button>' +
+      "</div>";
+
+  return '<td class="acciones-celda">' + contenido + "</td>";
+}
+
+// =====================================================
 // Utilidades de interfaz (la lógica pura está en logica.js)
 // =====================================================
 
@@ -593,5 +725,7 @@ sessionStorage.removeItem("gestorSesion");
 window.addEventListener("online", pintarLista);
 window.addEventListener("offline", pintarLista);
 
+pintarConmutador();
+pintarChips();
 pintarFiltros();
 pintarLista();

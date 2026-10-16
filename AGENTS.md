@@ -87,6 +87,16 @@ funcionar sin servidor. La misma web se empaqueta como **aplicación de escritor
   `Documentos\Gestor de Clientes\clientes.json` (dañado → se renombra a
   `clientes-daños-…json`, nunca se borra), arranque sin archivo → mensaje de migración
   en 2 clics («Exportar» en la web → «Importar» en la app).
+- **Listado compacto (spec 012)**: conmutador **«Tarjetas» ↔ «Listado»** en la cabecera de
+  la lista; el listado son filas con **solo los campos elegidos** mediante chips de
+  selección múltiple (por defecto solo «Empresa»; catálogo único `CATALOGO_CAMPOS` de 11
+  campos, «Fecha de alta» la última en dd/mm/aaaa local). Cada fila tiene **las mismas
+  acciones que la tarjeta** («Editar»/«Eliminar» con «¿Seguro? · Sí, eliminar / No» dentro
+  de la celda de acciones y marca de edición en toda la fila), el mismo filtro, búsqueda,
+  contador y estados vacíos, canto de color por tipo y **sin mapa ni iframes**; texto largo
+  en una línea cortada con «…» + `title`. **La vista y la selección NO se persisten**
+  (RF-1006): cada arranque empieza en «Tarjetas» con solo «Empresa» y no se crea ninguna
+  clave nueva de `localStorage`.
 
 ## Forma de trabajar (SDD)
 
