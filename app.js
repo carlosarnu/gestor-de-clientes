@@ -16,6 +16,9 @@ const formulario = document.getElementById("formulario-cliente");
 const listaClientes = document.getElementById("lista-clientes");
 const contador = document.getElementById("contador");
 const contenedorFiltros = document.getElementById("filtros");
+// Desplegable del filtro por provincia (spec 015, RF-1305): se repuebla en cada
+// pintarFiltroProvincia() con las provincias del filtro de tipo activo
+const campoFiltroProvincia = document.getElementById("filtro-provincia");
 const tituloFormulario = document.getElementById("titulo-formulario");
 const botonGuardar = document.getElementById("boton-guardar");
 const botonCancelar = document.getElementById("boton-cancelar");
@@ -48,6 +51,11 @@ const contenedorChips = document.getElementById("chips");
 let archivoInicialExiste = false;
 let clientes = cargarClientes();
 let filtroActivo = "Todos";
+// Filtro por provincia (spec 015, RF-1305): SOLO en memoria, sin ninguna clave
+// nueva (igual que el filtro de tipo y la vista). Se limpia en el alta (coherencia
+// con la 010) y se repuebla/valida en pintarFiltroProvincia() antes de cada
+// pintarLista() que pueda cambiar datos o pestaña. NO redeclarar.
+let filtroProvincia = "";
 let textoBusqueda = ""; // texto del buscador (spec 005)
 // Vista actual y campos elegidos del listado (spec 012): SOLO en memoria, sin
 // persistencia — al recargar se vuelve a «Tarjetas» con solo «Empresa» (RF-1006)
@@ -266,12 +274,18 @@ formulario.addEventListener("submit", function (evento) {
   // La limpieza va antes de pintarFiltros/pintarLista para que la lista se pinte sin filtro de texto
   textoBusqueda = "";
   campoBuscador.value = "";
+  // Coherencia con la 010 y la 015 (caso límite «Alta con filtro de provincia
+  // activo»): el alta vuelve a «Todos» y además desactiva el filtro de provincia
+  // para no dejar un filtro imposible; pintarFiltroProvincia() repuebla el
+  // <select> con las provincias de la lista ya con el cliente nuevo.
+  filtroProvincia = "";
   pintarAviso(mensajeAviso("guardado"));
 
   // Limpiamos el formulario y volvemos a la pestaña "Todos"
   resetearFormulario();
   filtroActivo = "Todos";
   pintarFiltros();
+  pintarFiltroProvincia(); // siempre ANTES de pintarLista (RF-1305)
   pintarLista();
 });
 
@@ -285,6 +299,10 @@ contenedorFiltros.addEventListener("click", function (evento) {
 
   filtroActivo = boton.dataset.filtro;
   pintarFiltros();
+  // Las provincias dependen del tipo activo: se repuebla ANTES de pintar la
+  // lista; si la selección ya no existe entre las nuevas opciones, la lógica la
+  // devuelve «» y el desplegable vuelve a «Todas las provincias» (RF-1305)
+  pintarFiltroProvincia();
   pintarLista();
 });
 
@@ -294,6 +312,47 @@ function pintarFiltros() {
     boton.classList.toggle("activo", boton.dataset.filtro === filtroActivo);
   });
 }
+
+// Desplegable de provincia (spec 015, RF-1305/RF-1306): una opción por provincia
+// de los clientes que pasan el filtro de TIPO activo (sin tener en cuenta la
+// búsqueda); de ahí salen también el valor validado de la selección y, más abajo,
+// los visibles. Las provincias únicas, su orden y la validación son de la lógica
+// pura (provinciasExistentes / provinciaValida): aquí solo se reconstruye el
+// <select> — opción «Todas las provincias» (value="") + una por provincia con su
+// texto tal cual se guardó (el value es ese mismo texto; la comparación
+// normalizada la hace la lógica al filtrar). Si la selección ya no existe entre
+// las opciones, provinciaValida() la devuelve «»: nunca un filtro imposible.
+function pintarFiltroProvincia() {
+  const provincias = provinciasExistentes(filtrarClientes(clientes, filtroActivo));
+  filtroProvincia = provinciaValida(provincias, filtroProvincia);
+
+  const opciones = ['<option value="">Todas las provincias</option>'];
+  provincias.forEach(function (provincia) {
+    opciones.push('<option value="' + escaparAtributo(provincia) + '">' + escapar(provincia) + "</option>");
+  });
+  campoFiltroProvincia.innerHTML = opciones.join("");
+
+  // La selección puede estar escrita con otra forma que la opción equivalente
+  // (p. ej. «Cádiz» elegida en «Todos» cuando en «Espuma» solo hay «CÁDIZ»): el
+  // <select> solo admite valores que existan como opción, así que alineamos el
+  // estado a la forma que se muestra. El filtrado no cambia (normaliza), solo el
+  // texto visible.
+  if (filtroProvincia !== "") {
+    const forma = provincias.find(function (provincia) {
+      return normalizar(provincia) === normalizar(filtroProvincia);
+    });
+    filtroProvincia = forma || "";
+  }
+  campoFiltroProvincia.value = filtroProvincia;
+}
+
+// Cambio del desplegable: la opción elegida pasa al estado en memoria (sin ninguna
+// clave nueva) y se repinta la lista. Las opciones solo dependen del filtro de tipo,
+// que aquí no cambia, así que no hace falta repintar el <select> (RF-1305)
+campoFiltroProvincia.addEventListener("change", function () {
+  filtroProvincia = campoFiltroProvincia.value;
+  pintarLista();
+});
 
 // =====================================================
 // Conmutador de vista y selector de campos (spec 012, RF-1001/RF-1002)
@@ -382,6 +441,9 @@ function iniciarEdicion(id) {
   formulario.email.value = cliente.email || "";
   formulario.direccion.value = cliente.direccion || "";
   formulario.codigoPostal.value = cliente.codigoPostal || "";
+  // Provincia con la única regla de lectura (RF-1302 / T-02): tolera clientes
+  // antiguos sin el campo y recorta; nunca `cliente.provincia` a pelo
+  formulario.provincia.value = provinciaCliente(cliente);
   // Tipos del cliente en los chips: fijos marcados y libres con su «×»
   // (copia nueva: el estado del formulario no debe mutar al cliente)
   tiposFormulario = tiposCliente(cliente).slice();
@@ -428,6 +490,8 @@ function guardarEdicion(datos) {
   clienteEditandoId = null;
   resetearFormulario();
   pintarFormularioModo();
+  // La edición puede cambiar o quitar la provincia del filtro activo (RF-1305)
+  pintarFiltroProvincia();
   pintarLista();
   pintarAviso(mensajeAviso("actualizado"));
 }
@@ -450,6 +514,9 @@ function eliminarCliente(id) {
 
   confirmandoEliminarId = null;
   guardarClientes();
+  // Si se borró el último cliente de la provincia filtrada, se repuebla y el
+  // filtro vuelve solo a «Todas las provincias» (RF-1305, caso límite)
+  pintarFiltroProvincia();
   pintarLista();
   pintarAviso(mensajeAviso("eliminado"));
 }
@@ -591,6 +658,9 @@ botonReemplazar.addEventListener("click", function () {
   }
 
   pintarFiltros();
+  // Misma regla que en la 015: si la provincia activa no está en la lista nueva,
+  // el desplegable se repuebla y vuelve a «Todas las provincias» (RF-1305)
+  pintarFiltroProvincia();
   ocultarConfirmacionImportacion();
   pintarLista();
   pintarAviso("Clientes importados");
@@ -623,8 +693,11 @@ botonImprimir.addEventListener("click", function () {
 // vigentes (Decisión 12 de la spec). No se rellena también en el clic del botón:
 // sería duplicar el cálculo sin añadir nada (beforeprint se dispara antes de
 // capturar la hoja). textContent pinta seguro, sin innerHTML.
+// Tercer argumento (spec 015, RF-1308): el filtro de provincia vigente; sin
+// provincia activa `textoContextoImpresion` omite la pieza y el texto es
+// idéntico al anterior (firma opcional compatible).
 window.addEventListener("beforeprint", function () {
-  cabeceraImpresion.textContent = textoContextoImpresion(filtroActivo, textoBusqueda);
+  cabeceraImpresion.textContent = textoContextoImpresion(filtroActivo, textoBusqueda, filtroProvincia);
 });
 
 // =====================================================
@@ -632,26 +705,32 @@ window.addEventListener("beforeprint", function () {
 // =====================================================
 
 // Clientes visibles en la lista AHORA: orden (más reciente primero) + filtro de
-// tipo + búsqueda de texto, con la lógica pura de logica.js. Compartida entre el
-// pintado y el guardia de «Imprimir» (plan §5): un solo cálculo, imposible que el
-// guardia y lo que se pinta divergan.
+// tipo + filtro de PROVINCIA + búsqueda de texto (combinación en Y, RF-1305), con
+// la lógica pura de logica.js. Compartida entre el pintado y el guardia de
+// «Imprimir» (plan §5): un solo cálculo, imposible que el guardia y lo que se
+// pinten divergan; el contador sale de aquí, así que refleja los tres a la vez.
 function visiblesActuales() {
-  return buscarClientes(filtrarClientes(ordenarClientes(clientes), filtroActivo), textoBusqueda);
+  const porTipo = filtrarClientes(ordenarClientes(clientes), filtroActivo);
+  const porProvincia = filtrarPorProvincia(porTipo, filtroProvincia);
+  return buscarClientes(porProvincia, textoBusqueda);
 }
 
 function pintarLista() {
   // Mismos visibles de siempre (filtro + búsqueda + orden, lógica en logica.js)
   const visibles = visiblesActuales();
 
-  // Contador de clientes (refleja tipo + búsqueda)
+  // Contador de clientes (refleja tipo + provincia + búsqueda, RF-1306)
   contador.textContent = textoContador(visibles.length);
 
-  // Lista vacía: mensaje según toque
+  // Lista vacía: mensaje según toque (prioridad búsqueda → provincia → tipo → vacío)
   if (visibles.length === 0) {
     let mensaje;
     if (textoBusqueda.trim() !== "") {
       mensaje = "No hay coincidencias para «" + escapar(textoBusqueda.trim()) +
         "». Prueba con otras palabras o con la pestaña «Todos».";
+    } else if (filtroProvincia.trim() !== "") {
+      mensaje = "No hay clientes en «" + escapar(filtroProvincia.trim()) +
+        "». Prueba con «Todas las provincias» o con la pestaña «Todos».";
     } else if (filtroActivo === "Todos") {
       mensaje = "Aún no hay clientes. Rellena el formulario de arriba para añadir el primero.";
       // Migración en 2 clics (spec 011, RF-903): solo en escritorio y solo si al
@@ -725,6 +804,10 @@ function crearTarjeta(cliente) {
         fila("Correo electrónico", cliente.email) +
         fila("Dirección", cliente.direccion) +
         fila("Código postal", cliente.codigoPostal) +
+        // Provincia (spec 015, RF-1303): justo tras CP y con la única regla de
+        // lectura; `fila()` devuelve «» con valor vacío, así que las fichas
+        // antiguas (todas) no muestran la línea
+        fila("Provincia", provinciaCliente(cliente)) +
       "</dl>" +
       cuadroMapa(cliente) +
       (cliente.notas ? '<p class="notas">' + escapar(cliente.notas) + "</p>" : "") +
@@ -865,4 +948,5 @@ pintarConmutador();
 pintarChips();
 pintarChipsTipos();
 pintarFiltros();
+pintarFiltroProvincia(); // desplegable con las provincias de arranque (RF-1305)
 pintarLista();

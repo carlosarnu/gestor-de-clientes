@@ -61,6 +61,70 @@
           <input type="text" id="codigo-postal" name="codigoPostal" autocomplete="postal-code" inputmode="numeric">
         </div>
 
+        <!-- Provincia (spec 015, RF-1302): campo combinado — el datalist solo
+             SUGIERE las 52 provincias/ciudades de España (las 4 principales
+             primero: Valencia, Alicante, Castellón, Murcia; el resto
+             alfabético) y se permite escribir cualquier texto libre; nada es
+             obligatorio (spec 007) y sin maxlength (la lógica solo recorta) -->
+        <div class="campo">
+          <label for="provincia">Provincia</label>
+          <input type="text" id="provincia" name="provincia" list="lista-provincias" autocomplete="address-level2">
+          <datalist id="lista-provincias">
+            <option value="Valencia"></option>
+            <option value="Alicante"></option>
+            <option value="Castellón"></option>
+            <option value="Murcia"></option>
+            <option value="A Coruña"></option>
+            <option value="Álava"></option>
+            <option value="Albacete"></option>
+            <option value="Almería"></option>
+            <option value="Asturias"></option>
+            <option value="Ávila"></option>
+            <option value="Badajoz"></option>
+            <option value="Barcelona"></option>
+            <option value="Bizkaia"></option>
+            <option value="Burgos"></option>
+            <option value="Cáceres"></option>
+            <option value="Cádiz"></option>
+            <option value="Cantabria"></option>
+            <option value="Ceuta"></option>
+            <option value="Ciudad Real"></option>
+            <option value="Córdoba"></option>
+            <option value="Cuenca"></option>
+            <option value="Gipuzkoa"></option>
+            <option value="Girona"></option>
+            <option value="Granada"></option>
+            <option value="Guadalajara"></option>
+            <option value="Huelva"></option>
+            <option value="Huesca"></option>
+            <option value="Illes Balears"></option>
+            <option value="Jaén"></option>
+            <option value="La Rioja"></option>
+            <option value="Las Palmas"></option>
+            <option value="León"></option>
+            <option value="Lleida"></option>
+            <option value="Lugo"></option>
+            <option value="Madrid"></option>
+            <option value="Málaga"></option>
+            <option value="Melilla"></option>
+            <option value="Navarra"></option>
+            <option value="Ourense"></option>
+            <option value="Palencia"></option>
+            <option value="Pontevedra"></option>
+            <option value="Salamanca"></option>
+            <option value="Santa Cruz de Tenerife"></option>
+            <option value="Segovia"></option>
+            <option value="Sevilla"></option>
+            <option value="Soria"></option>
+            <option value="Tarragona"></option>
+            <option value="Teruel"></option>
+            <option value="Toledo"></option>
+            <option value="Valladolid"></option>
+            <option value="Zamora"></option>
+            <option value="Zaragoza"></option>
+          </datalist>
+        </div>
+
         <!-- Tipos de cliente (spec 014, RF-1203): chips de selección múltiple en
              lugar del desplegable de la 008. Los tres chips fijos los pinta
              app.js desde TIPOS_FIJOS (fuente única) y los libres (con su «×»)
@@ -131,6 +195,17 @@
         <button type="button" class="filtro" data-filtro="Espuma">Espuma</button>
         <button type="button" class="filtro" data-filtro="Estructuras">Estructuras</button>
         <button type="button" class="filtro" data-filtro="Otros">Otros</button>
+      </div>
+
+      <!-- Filtro por provincia (spec 015, RF-1305): desplegable junto a las
+           pestañas de tipo. La opción «Todas las provincias» (por defecto) está
+           en el HTML; el repoblado con las provincias de los clientes —y la
+           combinación en Y con tipo y búsqueda— lo hace app.js (T-05) -->
+      <div class="filtro-provincia-bloque">
+        <label class="filtro-provincia" for="filtro-provincia">Provincia</label>
+        <select id="filtro-provincia" class="filtro-provincia-select">
+          <option value="" selected>Todas las provincias</option>
+        </select>
       </div>
 
       <!-- Copia de seguridad (spec 011, RF-901): exportar e importar -->

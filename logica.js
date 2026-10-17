@@ -99,9 +99,67 @@ function tiposSeleccionados(tipos, datos) {
   return legado === "" ? [] : [legado];
 }
 
-// Rellena los 13 campos de un cliente a partir del formulario: los 12 de siempre
-// más `tipos` (array canónico) junto a `tipo` (= tipos[0] ?? "", solo lectura
-// para versiones antiguas, RF-1201).
+// =====================================================
+// Provincia del cliente (spec 015)
+// =====================================================
+
+// Única regla de lectura de la provincia (RF-1301): «» si no hay cliente, no es un
+// objeto o el campo falta; el resto pasa por texto() (falsy → «», nunca «false»;
+// número no cero u objeto → convertidos a texto; recortado). No escribe nada.
+function provinciaCliente(cliente) {
+  if (!cliente || typeof cliente !== "object") return "";
+  return texto(cliente.provincia);   // texto() ya convierte a string y recorta
+}
+
+// Provincias del filtro (RF-1305): strings únicos por normalizar() (acentos y
+// mayúsculas fuera), mostrando la PRIMERA forma guardada, sin vacíos y en orden
+// alfabético (localeCompare «es»). Los datos no se tocan.
+function provinciasExistentes(lista) {
+  const unicas = new Map();
+  for (const cliente of lista) {
+    const valor = provinciaCliente(cliente);
+    if (valor === "") continue;
+    const clave = normalizar(valor);
+    if (!unicas.has(clave)) unicas.set(clave, valor);
+  }
+  return Array.from(unicas.values())
+    .sort(function (a, b) { return a.localeCompare(b, "es"); });
+}
+
+// ¿La provincia del cliente coincide con la pedida normalizando acentos y
+// mayúsculas? («Cádiz» ~ «cadiz» SOLO para el filtro, Decisión 3; los datos
+// guardados no cambian). Pedida vacía → false (sin filtrar).
+function coincideProvincia(cliente, provincia) {
+  const pedida = normalizar(provincia);
+  return pedida !== "" && normalizar(provinciaCliente(cliente)) === pedida;
+}
+
+// Filtro por provincia en Y con el de tipo (RF-1305): «» (sin selección; el
+// <select> solo emite «» o nombres de provincia) → la lista tal cual; el resto,
+// solo los clientes cuya provincia coincida normalizada (los sin provincia solo
+// salen en «Todas las provincias»).
+function filtrarPorProvincia(lista, provincia) {
+  const pedida = texto(provincia);
+  if (pedida === "") return lista;
+  return lista.filter(function (c) { return coincideProvincia(c, pedida); });
+}
+
+// Selección válida del desplegable (RF-1305): `provincias` es el array de STRINGS
+// de salida de provinciasExistentes (no clientes). La selección se conserva si
+// sigue existiendo entre esas opciones (comparando forma normalizada); si no, o si
+// viene vacía → "" («Todas las provincias», nunca un filtro imposible).
+function provinciaValida(provincias, seleccion) {
+  const pedida = texto(seleccion);
+  if (pedida === "") return "";
+  const clave = normalizar(pedida);
+  return provincias.some(function (p) { return normalizar(p) === clave; })
+    ? pedida : "";
+}
+
+// Rellena los 14 campos de un cliente a partir del formulario: los 13 de siempre
+// más `provincia` (spec 15, entre código postal y tipos) junto a `tipos` (array
+// canónico) y `tipo` (= tipos[0] ?? "", solo lectura para versiones antiguas,
+// RF-1201).
 // Conserva id y fecha de `actual` (los pone él mismo).
 // Todos los datos son opcionales (spec 007): lo que no venga, queda en "".
 function actualizarCliente(actual, datos, tipos) {
@@ -117,6 +175,7 @@ function actualizarCliente(actual, datos, tipos) {
     email: texto(datos.get("email")),
     direccion: texto(datos.get("direccion")),
     codigoPostal: texto(datos.get("codigoPostal")),
+    provincia: texto(datos.get("provincia")),
     tipos: listaTipos,
     tipo: listaTipos.length > 0 ? listaTipos[0] : "",
     notas: texto(datos.get("notas"))
@@ -305,15 +364,16 @@ function normalizar(valor) {
 }
 
 // Texto completo de un cliente para buscar en él: TODOS sus tipos efectivos
-// unidos (RF-1206: «tela toldos» se reparte entre tipos del mismo cliente) y, si
-// no tiene tipos, la convención de la 005 de buscar también en «Sin tipo»
+// unidos (RF-1206: «tela toldos» se reparte entre tipos del mismo cliente), su
+// provincia (RF-1304) y, si no tiene tipos, la convención de la 005 de buscar
+// también en «Sin tipo»
 function textoBusquedaCliente(cliente) {
   const tipos = tiposCliente(cliente);
   const textoTipos = tipos.length > 0 ? tipos.join(" ") : nombreTipo("");
   return normalizar([
     cliente.empresa, cliente.cif, cliente.contacto, cliente.telefono,
     cliente.movil, cliente.email, cliente.direccion, cliente.codigoPostal,
-    cliente.notas, textoTipos
+    provinciaCliente(cliente), cliente.notas, textoTipos
   ].join(" "));
 }
 
@@ -392,6 +452,7 @@ function importarClientes(textoJson) {
       email: texto(elemento.email),
       direccion: texto(elemento.direccion),
       codigoPostal: texto(elemento.codigoPostal),
+      provincia: texto(elemento.provincia),
       // `tipos` se copia TAL CUAL (cualquier valor JSON) y la normalización,
       // la migración FOAM y la reescritura de `tipo` las hace migrarTipos abajo
       tipos: elemento.tipos,
@@ -411,7 +472,7 @@ function importarClientes(textoJson) {
 // Único catálogo de campos elegibles en el listado (RF-1002): de él penden tanto el
 // selector de chips como el orden de las columnas. Orden = orden del formulario con
 // «Fecha de alta» al final (es un dato de alta, no del formulario); `id` nunca se
-// ofrece. Pensado para ampliarse con «Provincia» (spec 015) y «Tipo» múltiple (014).
+// ofrece. Con «Provincia» (spec 015) y «Tipo» múltiple (014) ya ampliado.
 const CATALOGO_CAMPOS = [
   { clave: "empresa", etiqueta: "Empresa" },
   { clave: "cif", etiqueta: "CIF" },
@@ -421,6 +482,7 @@ const CATALOGO_CAMPOS = [
   { clave: "email", etiqueta: "Correo electrónico" },
   { clave: "direccion", etiqueta: "Dirección" },
   { clave: "codigoPostal", etiqueta: "Código postal" },
+  { clave: "provincia", etiqueta: "Provincia" },
   { clave: "tipo", etiqueta: "Tipo" },
   { clave: "notas", etiqueta: "Notas" },
   { clave: "fecha", etiqueta: "Fecha de alta" }
@@ -514,15 +576,21 @@ function construirFilas(clientes, campos, hoy) {
 
 // Texto de la cabecera impresa en papel: «Gestor de Clientes» + «Filtro: X» (solo
 // si el filtro no es «Todos» ni viene vacío; la etiqueta es la de la pestaña tal
-// cual, «Otros» literal) + «Búsqueda: «texto»» (solo si tras recortar queda algo),
-// unidas por « · » y con las piezas vacías omitidas — Decisión 6 de la spec.
+// cual, «Otros» literal) + «Provincia: X» (solo con provincia filtrada, spec 015,
+// RF-1308: tercer parámetro opcional; sin él el texto no cambia en un carácter) +
+// «Búsqueda: «texto»» (solo si tras recortar queda algo), unidas por « · » y con
+// las piezas vacías omitidas — Decisión 6 de la spec.
 // Texto plano SIN HTML: la seguridad al pintarla la da textContent en app.js;
 // conserva acentos, mayúsculas y comillas tal cual las escribió el usuario.
-function textoContextoImpresion(filtro, busqueda) {
+function textoContextoImpresion(filtro, busqueda, provincia) {
   const piezas = ["Gestor de Clientes"];
   const filtroLimpio = texto(filtro);
   if (filtroLimpio !== "" && filtroLimpio !== "Todos") {
     piezas.push("Filtro: " + filtroLimpio);
+  }
+  const provinciaLimpia = texto(provincia);
+  if (provinciaLimpia !== "") {
+    piezas.push("Provincia: " + provinciaLimpia);
   }
   const busquedaLimpia = texto(busqueda);
   if (busquedaLimpia !== "") {
@@ -572,6 +640,11 @@ if (typeof module !== "undefined" && module.exports) {
     fechaTextoLocal,
     construirCeldas,
     construirFilas,
-    textoContextoImpresion
+    textoContextoImpresion,
+    provinciaCliente,
+    provinciasExistentes,
+    coincideProvincia,
+    filtrarPorProvincia,
+    provinciaValida
   };
 }

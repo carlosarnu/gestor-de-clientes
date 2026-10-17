@@ -112,13 +112,13 @@ test("esTipoFijo solo reconoce Tela, Espuma y Estructuras (RF-601)", () => {
 
 // ===== alta (RF-011: formato de datos) =====
 
-test("construirCliente crea los 13 campos con id y fecha dados (RF-011, RF-502, RF-1201)", () => {
+test("construirCliente crea los 14 campos con id y fecha dados (RF-011, RF-502, RF-1201, RF-1301)", () => {
   const nuevo = construirCliente(
     formulario({ empresa: "  Muebles Rápido  ", cif: "A1", contacto: "", telefono: " 611 ", movil: "622333444", email: "", direccion: "Calle Luna 5", codigoPostal: "28002", tipo: "Espuma", notas: "nada" }),
     555,
     1760000000000
   );
-  assert.deepEqual(Object.keys(nuevo), ["id", "fecha", "empresa", "cif", "contacto", "telefono", "movil", "email", "direccion", "codigoPostal", "tipos", "tipo", "notas"]);
+  assert.deepEqual(Object.keys(nuevo), ["id", "fecha", "empresa", "cif", "contacto", "telefono", "movil", "email", "direccion", "codigoPostal", "provincia", "tipos", "tipo", "notas"]);
   assert.equal(nuevo.id, 555);
   assert.equal(nuevo.fecha, 1760000000000);
   assert.equal(nuevo.empresa, "Muebles Rápido");
@@ -399,7 +399,7 @@ test("importarClientes normaliza los campos que faltan y descarta lo que no sea 
   assert.equal(resultado.error, null);
   assert.equal(resultado.clientes.length, 2); // la basura se ignora
   const cliente = resultado.clientes[0];
-  assert.deepEqual(Object.keys(cliente), ["id", "fecha", "empresa", "cif", "contacto", "telefono", "movil", "email", "direccion", "codigoPostal", "tipos", "tipo", "notas"]);
+  assert.deepEqual(Object.keys(cliente), ["id", "fecha", "empresa", "cif", "contacto", "telefono", "movil", "email", "direccion", "codigoPostal", "provincia", "tipos", "tipo", "notas"]);
   assert.deepEqual(cliente.tipos, []); // sin tipo en el fichero: sin tipos
   assert.equal(cliente.empresa, "Muebles Rápido"); // espacios recortados
   assert.equal(cliente.telefono, "611");
@@ -444,25 +444,25 @@ const CLIENTE_SIN_DATOS = {
   email: "", direccion: "", codigoPostal: "", tipo: "", notas: ""
 };
 
-test("CATALOGO_CAMPOS lista los 11 campos en orden de formulario con «Fecha de alta» al final (RF-1002/RF-1005)", () => {
-  assert.equal(CATALOGO_CAMPOS.length, 11);
+test("CATALOGO_CAMPOS lista los 12 campos en orden de formulario con «Fecha de alta» al final (RF-1002/RF-1005, RF-1307)", () => {
+  assert.equal(CATALOGO_CAMPOS.length, 12);
   assert.deepEqual(CATALOGO_CAMPOS.map(c => c.clave), [
     "empresa", "cif", "contacto", "telefono", "movil", "email",
-    "direccion", "codigoPostal", "tipo", "notas", "fecha"
+    "direccion", "codigoPostal", "provincia", "tipo", "notas", "fecha"
   ]);
   assert.deepEqual(CATALOGO_CAMPOS.map(c => c.etiqueta), [
     "Empresa", "CIF", "Contacto", "Teléfono", "Móvil", "Correo electrónico",
-    "Dirección", "Código postal", "Tipo", "Notas", "Fecha de alta"
+    "Dirección", "Código postal", "Provincia", "Tipo", "Notas", "Fecha de alta"
   ]);
   // el id nunca se ofrece y ninguna clave se repite
   assert.equal(CATALOGO_CAMPOS.some(c => c.clave === "id"), false);
-  assert.equal(new Set(CATALOGO_CAMPOS.map(c => c.clave)).size, 11);
+  assert.equal(new Set(CATALOGO_CAMPOS.map(c => c.clave)).size, 12);
 });
 
 test("normalizarSeleccion descarta claves fuera del catálogo y respeta su orden (RF-1005)", () => {
   assert.deepEqual(normalizarSeleccion(["notas", "empresa"]), ["empresa", "notas"]);
   assert.deepEqual(normalizarSeleccion(["tipo", "cif"]), ["cif", "tipo"]);
-  assert.deepEqual(normalizarSeleccion(["id", "provincia", "empresa"]), ["empresa"]);
+  assert.deepEqual(normalizarSeleccion(["id", "provincia", "empresa"]), ["empresa", "provincia"]);
 });
 
 test("normalizarSeleccion quita las claves duplicadas (RF-1005)", () => {

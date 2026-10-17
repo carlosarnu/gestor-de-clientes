@@ -1,8 +1,8 @@
 # AGENTS.md — Gestor de Clientes
 
 Web estática y portable para que un comercial autónomo gestione sus clientes
-(empresa, CIF, contacto, teléfono, email, dirección, varios tipos de cliente — Tela,
-Espuma, Estructuras u otros —, y notas) mediante almacenamiento local. Pensada para abrirse con doble clic y
+(empresa, CIF, contacto, teléfono, email, dirección, provincia, varios tipos de
+cliente — Tela, Espuma, Estructuras u otros —, y notas) mediante almacenamiento local. Pensada para abrirse con doble clic y
 funcionar sin servidor. La misma web se empaqueta como **aplicación de escritorio** (`escritorio/`, Electron, spec 011) guardando en `Documentos\Gestor de Clientes\clientes.json`.
 
 ## Stack y estructura
@@ -33,9 +33,11 @@ funcionar sin servidor. La misma web se empaqueta como **aplicación de escritor
 ## Datos
 
 - `localStorage`, clave única `gestorClientes` (JSON con un array de clientes).
-- Esquema del cliente (**13 campos**): `{ id, fecha, empresa, cif, contacto, telefono,
-  movil, email, direccion, codigoPostal, tipos, tipo, notas }`. **Ningún campo es
+- Esquema del cliente (**14 campos**): `{ id, fecha, empresa, cif, contacto, telefono,
+  movil, email, direccion, codigoPostal, provincia, tipos, tipo, notas }`. **Ningún campo es
   obligatorio** (spec 007): lo vacío se muestra como «Sin nombre»/«Sin tipo».
+- `provincia` (spec 015) es **texto libre opcional**: si un cliente antiguo no la tiene
+  se lee como `""` **sin ninguna escritura de migración** (a diferencia de `tipos`).
 - `tipos` es un **array canónico** con todos los tipos del cliente (los tres fijos
   `"Tela" | "Espuma" | "Estructuras"` y **texto libre** sin límite, en orden de adición y
   sin duplicados; spec 014). `tipo` es un **string de compatibilidad, solo de lectura**:
@@ -95,7 +97,7 @@ funcionar sin servidor. La misma web se empaqueta como **aplicación de escritor
   en 2 clics («Exportar» en la web → «Importar» en la app).
 - **Listado compacto (spec 012)**: conmutador **«Tarjetas» ↔ «Listado»** en la cabecera de
   la lista; el listado son filas con **solo los campos elegidos** mediante chips de
-  selección múltiple (por defecto solo «Empresa»; catálogo único `CATALOGO_CAMPOS` de 11
+  selección múltiple (por defecto solo «Empresa»; catálogo único `CATALOGO_CAMPOS` de 12
   campos, «Fecha de alta» la última en dd/mm/aaaa local). Cada fila tiene **las mismas
   acciones que la tarjeta** («Editar»/«Eliminar» con «¿Seguro? · Sí, eliminar / No» dentro
   de la celda de acciones y marca de edición en toda la fila), el mismo filtro, búsqueda,
@@ -128,6 +130,20 @@ funcionar sin servidor. La misma web se empaqueta como **aplicación de escritor
   impresión muestran la celda unida («Tela + Espuma»). Se guarda con `tipos` (array) +
   `tipo` = `tipos[0] ?? ""` (compatibilidad de lectura), con migración idempotente en las
   tres rutas de carga (web, escritorio, importar).
+- **Provincia (spec 015)**: campo **`provincia`** opcional en el esquema. En el
+  formulario es un **campo combinado** `<input list="lista-provincias">` + `<datalist>`
+  estático con las **52 provincias/ciudades de España** (primero Valencia, Alicante,
+  Castellón y Murcia, el resto alfabético): el navegador sugiere y **permite escribir
+  libre** (se guarda lo escrito, recortado). La ficha muestra la línea **«Provincia»
+  tras «Código postal»** (oculta si vacía); «Provincia» entra en el buscador y en el
+  catálogo del listado (**12 campos**, entre CP y Tipo, «—» sin valor). **Filtro por
+  provincia** (desplegable «Todas las provincias» + una opción por provincia de los
+  clientes del **tipo activo**, variantes homófonas unificadas normalizando acentos y
+  mayúsculas, y vuelta a «Todas» si la selección desaparece) que se combina en **Y** con
+  el filtro de tipo y la búsqueda; la cabecera de impresión gana la 3ª pieza
+  «Provincia: X». **Sin claves nuevas** de `localStorage` y **sin escritura de
+  migración** (los clientes antiguos sin `provincia` se leen como `""` y no se
+  reescriben).
 
 ## Forma de trabajar (SDD)
 
