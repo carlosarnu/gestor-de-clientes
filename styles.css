@@ -109,6 +109,8 @@ h2 {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0; /* el track «1fr» puede ser más estrecho que el contenido:
+                   los chips de tipos largos recortan en vez de desbordar */
 }
 
 .campo label {
@@ -442,7 +444,20 @@ h2 {
 .chip-libre {
   padding: 0 2px 0 14px;
   gap: 2px;
+  max-width: 100%; /* nunca más ancho que el contenedor: el texto se corta */
+  min-width: 0; /* como flex item puede encoger bajo su min-content (nowrap):
+                   el texto se recorta con «…» y la «×» no pierde sus 44 px */
   cursor: default;
+}
+
+/* Texto del chip libre: en una sola línea y cortado con «…» (el `title`
+   muestra el tipo completo). Sin esto, un tipo de 40+ caracteres empujaría
+   al flex a encoger la «×» por debajo de los 44 px (RF-1203) */
+.chip-texto {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chip-libre:hover {
@@ -450,13 +465,16 @@ h2 {
 }
 
 /* «×» de quitar: 44 × 44 px reales (objetivo táctil), redonda y sin borde,
-   heredando el texto del chip; el foco va dentro del chip (outline inset) */
+   heredando el texto del chip; el foco va dentro del chip (outline inset).
+   `flex-shrink: 0` es imprescindible: sin él, el flex del chip la estrecha
+   por debajo de 44 px cuando la etiqueta es larga (reviewer, ronda 1) */
 .chip-quitar {
   font: inherit;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   width: 44px;
   height: 44px;
   padding: 0;

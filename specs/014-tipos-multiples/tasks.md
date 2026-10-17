@@ -83,12 +83,30 @@
     teclado: Shift+Tab hasta el chip con `:focus-visible`, Espacio alterna dos veces con
     el foco conservado en el chip repintado, Intro en «Añadir otro tipo» añade **sin**
     disparar el submit; 375 px: 7 chips en 4 líneas, `scrollWidth` 375 (sin desbordes),
-    chips 46 px y «×» 44×44; sin claves nuevas (solo `gestorClientes`), consola limpia y
+    chips 46 px y «×» 44×44 **con etiquetas cortas** (la medición con tipos de 40+
+    caracteres se corrigió en la ronda del reviewer: ver «Corrección reviewer» abajo);
+    sin claves nuevas (solo `gestorClientes`), consola limpia y
     datos de prueba borrados. Retirada la guarda interina de T-03
     (`aplicarEdicion(…, tiposCliente(cliente))` → `tiposFormulario`); `sincronizarTipoOtro`,
     `cargarTipoEnFormulario` y el `change` del desplegable ya no existían en `app.js`
     (se retiraron al eliminar el JS de la 008 en T-03). `styles.css` sin cambios:
     `.chip-libre`/`.chip-quitar` cubrían todo lo necesario)*
+  - **Corrección reviewer (ronda 1, 2026-10-17)**: la medición anterior solo
+    valía con etiquetas cortas — con un tipo libre de 40 caracteres (el
+    `maxlength` del input) la «×» se estrechaba a **40,56 px** y con uno
+    importado de 47 a **36,19 px** (flex-shrink dentro del chip). Arreglo en
+    CSS + el pintado del chip: el texto del chip libre va ahora en
+    `<span class="chip-texto">` con `title` (muestra el tipo completo);
+    `styles.css` añade `.chip-texto` (`min-width: 0` + `overflow: hidden` +
+    `text-overflow: ellipsis` + `white-space: nowrap`), `flex-shrink: 0` en
+    `.chip-quitar`, y `min-width: 0` en `.chip-libre` y `.campo` (el track grid
+    `1fr` puede ser más estrecho que el contenido sin desbordar). Re-verificado
+    a 375 px con chips de 40 y 47 caracteres: «×» **44×44** en ambos,
+    `scrollWidth` 375 (sin desbordes), recorte con «…» + `title` completo, foco
+    `:focus-visible` intacto, etiqueta a 14,4 px legible, chips cortos sin
+    recorte («Toldos» 106,41 px) y escritorio 1280 sin cambios. `node --test`
+    105/105. Commit: «Spec 014-tipos-multiples: asegura la X de 44px en chips
+    largos (reviewer)»*
 
 - [x] **T-05 — Tarjeta con badges y canto del primer tipo + celda del listado (`app.js`)**
   - **Descripción:** `crearTarjeta` pinta **un badge por tipo** (`tiposCliente` +

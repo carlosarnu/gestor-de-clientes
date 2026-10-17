@@ -161,8 +161,11 @@ function pintarChipsTipos() {
   const libres = tiposFormulario
     .filter(function (tipo) { return !esTipoFijo(tipo); })
     .map(function (tipo) {
+      // El texto va en su propio <span> (`.chip-texto`): así el CSS lo corta
+      // con «…» (title muestra el completo) y la «×» conserva 44 px reales
+      // aunque el tipo tenga 40 o más caracteres (RF-1203)
       return '<span class="chip chip-libre" data-tipo-libre="' + escaparAtributo(tipo) + '">' +
-        escapar(tipo) +
+        '<span class="chip-texto" title="' + escaparAtributo(tipo) + '">' + escapar(tipo) + "</span>" +
         '<button type="button" class="chip-quitar" data-tipo="' + escaparAtributo(tipo) +
         '" aria-label="Quitar tipo ' + escaparAtributo(tipo) + '">×</button>' +
         "</span>";
