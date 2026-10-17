@@ -562,6 +562,12 @@ h2 {
 
 /* La ficha de cliente lleva el canto del color de su material */
 .tarjeta {
+  /* El badge de un tipo largo no desborda el documento (RF-1211): como grid
+     item del `1fr` (minmax(auto,1fr)) su auto-minimum la estiraba al min-
+     content del badge (nowrap) y toda la tarjeta crecía; con min-width: 0 el
+     track se queda en lo disponible y el contenido estrecho se recorta (mismo
+     criterio que .campo en la corrección de los chips, ronda 1) */
+  min-width: 0;
   background: var(--superficie);
   border: 1px solid var(--linea);
   border-left: 6px solid var(--linea);
@@ -611,15 +617,26 @@ h2 {
 
 /* Varios badges (spec 014, RF-1207): se agrupan juntos a la derecha de la
    cabecera (con un solo badge el aspecto es idéntico al de siempre) y
-   envuelven línea a línea sin desbordes, también a 375 px */
+   envuelven línea a línea; un texto largo no desborda el grupo: el badge se
+   corta con «…» y su `title` muestra el tipo completo, también a 375 px.
+   min-width: 0 es necesario aquí igual que en .tarjeta: como flex item, su
+   auto-minimum sería el min-content del badge nowrap y no bajaría de ese
+   ancho ni en su propia línea */
 .etiquetas {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
+  min-width: 0;
+  max-width: 100%;
 }
 
+/* Un tipo libre puede tener cualquier longitud (RF-1203 no trunca: solo es
+   presentación), así que el badge nunca es más ancho que su contenedor: con
+   max-width/min-width puede encoger bajo su min-content (nowrap) y el texto
+   se corta con «…» (mismo criterio que .chip-texto y las celdas del listado;
+   el `title` lo lleva completo). Un texto corto no se toca: sin recorte */
 .etiqueta {
   font-size: 0.75rem;
   font-weight: 700;
@@ -628,6 +645,10 @@ h2 {
   background: var(--linea-suave);
   color: var(--tinta-media);
   white-space: nowrap;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .etiqueta-tela {
@@ -1142,6 +1163,15 @@ h2 {
      corte con «…» y el title son recursos de pantalla) */
   .listado th,
   .listado td {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  /* El badge del tipo sigue la misma regla de pantalla (Decisión 8): en papel
+     su texto sale completo y sin límite de ancho (lo decide el papel) */
+  .etiqueta {
+    max-width: none;
     white-space: normal;
     overflow: visible;
     text-overflow: clip;

@@ -687,11 +687,13 @@ function crearTarjeta(cliente) {
   // Tipos efectivos (RF-1207): un badge por cada tipo, cada uno con su color
   // (fijos con su paleta por claseTipo, libres en violeta «otros»). Sin tipos se
   // pinta la lista [""] y sale la etiqueta «Sin tipo» de siempre (mismo aspecto
-  // que hasta ahora). El texto va por escapar() (contexto de texto); no se pintan
-  // data-* ni title en los badges, así que no hace falta escaparAtributo.
+  // que hasta ahora). El texto va por escapar() (contexto de texto); el `title`
+  // (atributo, solo si hay tipo) por escaparAtributo: el CSS corta el badge
+  // largo con «…» y el title lo muestra completo (como .chip-texto y las celdas)
   const tipos = tiposCliente(cliente);
   const etiquetas = (tipos.length > 0 ? tipos : [""]).map(function (tipo) {
-    return '<span class="etiqueta etiqueta-' + claseTipo(tipo) + '">' +
+    return '<span class="etiqueta etiqueta-' + claseTipo(tipo) + '"' +
+      (tipo ? ' title="' + escaparAtributo(tipo) + '"' : "") + ">" +
       escapar(nombreTipo(tipo)) +
       "</span>";
   }).join("");

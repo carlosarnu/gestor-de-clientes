@@ -133,6 +133,29 @@
     dos vistas; regresiones de filtro («Tela» incluye a los multis) y búsqueda
     («espuma») intactas; consola limpia y datos de prueba borrados. `styles.css`
     solo añade `.etiquetas` (grupo flex de los badges en la cabecera))*
+  - **Corrección reviewer (ronda 2, 2026-10-17)**: un tipo libre largo desbordaba
+    la página a 375 px — `.etiqueta` llevaba `white-space: nowrap` sin recorte, y
+    el auto-minimum del grid (`1fr` = `minmax(auto,1fr)`) estiraba la tarjeta
+    entera al min-content del badge (el acta T-07: 51 chars → 385, 55 → 409,
+    60 → 440 de `scrollWidth`; con sus datos llegaba a 510). Arreglo **solo de
+    presentación** (la lógica sigue sin truncar, RF-1203): `.etiqueta` con
+    `max-width: 100%` + `min-width: 0` + `overflow: hidden` + `text-overflow:
+    ellipsis` (mismo criterio que `.chip-texto` y las celdas del listado) y, para
+    que el badge pueda encoger de verdad, `min-width: 0` en `.tarjeta` (grid item)
+    y en `.etiquetas` (flex item) — mismo mecanismo que `.campo` en la corrección
+    de ronda 1; el badge lleva ahora `title` con `escaparAtributo` (solo si hay
+    tipo; «Sin tipo» sin `title`). En papel (`@media print`) el badge sigue la
+    Decisión 8 de la 013: `max-width: none` y texto completo. Re-verificado a
+    375 (`emulate 375x812x2,mobile,touch`): `scrollWidth` **375** con tipos de
+    51/55/60 caracteres (recorte con «…» y `title` íntegro), payload
+    `Lona "especial" <b onclick=…>` con **0 atributos inyectados** y
+    `window.__inye` undefined, tipo corto idéntico («Toldos» 56,75 px sin
+    recorte), 12 tipos cortos con los mismos anchos que antes (envueltos),
+    colores y canto del primer tipo intactos, listado (celda unida
+    «Tela + Espuma + Toldos» con su «…»+`title`) y formulario («×» 44×44) a 375,
+    escritorio 1280 con 3 columnas sin desbordes, consola limpia y datos de
+    prueba borrados. `node --test` 105/105. Commit: «Spec 014-tipos-multiples:
+    recorta badges largos sin desbordes a 375px (reviewer)»*
 
 - [x] **T-06 — Filtros por pertenencia, contador y estados vacíos (`app.js`, integración)**
   - **Descripción:** verificar/ajustar el pintado para que las pestañas usen el
@@ -213,6 +236,12 @@
     no la crea esta app), `sessionStorage` vacía, **`node --test` 105/105**,
     `node --check` limpio, consola sin errores de la app y datos de prueba borrados
     (arranque limpio verificado tras recarga)*
+    *(Revisión post-cierre (ronda 2 del reviewer, 2026-10-17): el `scrollWidth` 375
+    de «tarjetas» medido aquí se sostiene solo con tipos cortos — con el tipo de
+    **51 caracteres** importado en (4) la tarjeta desbordaba 10 px (385) y con
+    los datos de este acta el documento llegaba a **510**; corregido en la
+    «Corrección reviewer (ronda 2)» de T-05 y re-verificado a 375 con tipos de
+    51/55/60: `scrollWidth` 375)*
 
 - [x] **T-08 — Documentación y cierre**
   - **Descripción:** `AGENTS.md` (esquema con `tipos`, formulario con chips, filtros por
