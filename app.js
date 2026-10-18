@@ -61,10 +61,6 @@ let textoBusqueda = ""; // texto del buscador (spec 005)
 // persistencia — al recargar se vuelve a «Tarjetas» con solo «Empresa» (RF-1006)
 let vistaActual = "tarjetas"; // "tarjetas" (por defecto) o "listado"
 let camposSeleccionados = normalizarSeleccion(["empresa"]); // 1 campo por defecto
-// Tipos elegidos en el formulario (spec 014, RF-1203/RF-1210): SOLO en memoria,
-// sin persistencia (ninguna clave nueva): se vacía al resetear el formulario y se
-// carga con los tipos del cliente al entrar en edición
-let tiposFormulario = [];
 let clienteEditandoId = null; // id del cliente en edición, o null si no se está editando
 let confirmandoEliminarId = null; // id de la tarjeta mostrando "¿Seguro?", o null si no hay ninguna
 let importacionPendiente = null; // clientes del fichero esperando confirmación, o null
@@ -142,110 +138,50 @@ function guardarClientes() {
 // Formulario
 // =====================================================
 
-// --- Chips de tipos del formulario (spec 014, RF-1203/RF-1204) ---
-// Los tres chips fijos se generan desde TIPOS_FIJOS (fuente única de la que
-// cuelga esTipoFijo, plan §3/D-8) y los tipos propios del usuario se pintan
-// como chips libres con su «×». La selección vive en `tiposFormulario` (solo
-// en memoria, RF-1210); la 008 (desplegable y campo «Otros») ya no existe.
-const contenedorChipsTipos = document.getElementById("chips-tipos");
+// --- Tipo de cliente: desplegable + campo condicional (spec 016, RF-1401/1402/1403) ---
+// El <select> tiene 5 opciones (Sin tipo vacía + 3 fijos + Otros); al elegir
+// «Otros» aparece el campo de texto (oculto con hidden, no ocupa espacio). El
+// desplegable es de SELECCIÓN ÚNICA (Decisión 4 de la spec 016): el array `tipos`
+// se construye con la sola elección del desplegable; un multi-tipo importado
+// solo conserva su primer tipo al editar (limitación documentada).
+const campoTipo = document.getElementById("tipo");
 const campoTipoOtro = document.getElementById("tipo-otro");
-const botonAnadirTipo = document.getElementById("boton-anadir-tipo");
+const campoTipoOtroContenedor = document.getElementById("campo-tipo-otro");
 
-// Repinta los chips del formulario: fijos con su casilla (aria-checked + «✔/□»,
-// estado visible sin depender solo del color) y libres con su botón «×»
-function pintarChipsTipos() {
-  const fijos = TIPOS_FIJOS.map(function (tipo) {
-    const marcado = tiposFormulario.indexOf(tipo) !== -1;
-    return '<button type="button" class="chip' + (marcado ? " marcado" : "") +
-      '" role="checkbox" aria-checked="' + (marcado ? "true" : "false") +
-      '" data-tipo="' + escaparAtributo(tipo) + '">' +
-      '<span class="chip-marca" aria-hidden="true">' + (marcado ? "✔" : "□") + "</span>" +
-      escapar(tipo) +
-      "</button>";
-  });
-
-  // Libres = los tipos elegidos que no son fijos, en orden de adición;
-  // el texto del «×» lleva aria-label en español (regla 5)
-  const libres = tiposFormulario
-    .filter(function (tipo) { return !esTipoFijo(tipo); })
-    .map(function (tipo) {
-      // El texto va en su propio <span> (`.chip-texto`): así el CSS lo corta
-      // con «…» (title muestra el completo) y la «×» conserva 44 px reales
-      // aunque el tipo tenga 40 o más caracteres (RF-1203)
-      return '<span class="chip chip-libre" data-tipo-libre="' + escaparAtributo(tipo) + '">' +
-        '<span class="chip-texto" title="' + escaparAtributo(tipo) + '">' + escapar(tipo) + "</span>" +
-        '<button type="button" class="chip-quitar" data-tipo="' + escaparAtributo(tipo) +
-        '" aria-label="Quitar tipo ' + escaparAtributo(tipo) + '">×</button>' +
-        "</span>";
-    });
-
-  contenedorChipsTipos.innerHTML = fijos.concat(libres).join("");
+// Muestra u oculta el campo condicional según la opción del desplegable.
+// Al ocultarlo también se vacía su valor (el texto escrito no cuenta si se
+// cambia de opción; RF-1402)
+function alternarCampoOtro() {
+  const otros = campoTipo.value === "Otros";
+  campoTipoOtroContenedor.hidden = !otros;
+  if (!otros) campoTipoOtro.value = "";
 }
 
-// «Añadir otro tipo» (botón o Intro): el texto recortado pasa a chip — si
-// coincide exactamente con un fijo se marca él, y si ya estaba no se duplica
-// (las reglas viven en añadirTipoLibre); vacío o solo espacios no añade nada
-function anadirTipoDelCampo() {
-  tiposFormulario = añadirTipoLibre(tiposFormulario, campoTipoOtro.value);
-  campoTipoOtro.value = "";
-  pintarChipsTipos();
-  campoTipoOtro.focus(); // se puede seguir añadiendo sin salir del campo
+// El desplegable cambió: muestra u oculta el campo condicional
+campoTipo.addEventListener("change", alternarCampoOtro);
+
+// Lee el desplegable y el campo condicional y devuelve la lista `tipos` (array):
+// «Sin tipo» → []; fijo → [fijo]; «Otros» → [texto recortado] o ["Otros"] si
+// vacío; texto que coincide con un fijo escrito en «Otros» → se guarda como fijo
+// (RF-1403). Este es el ÚNICO punto donde el formulario convierte la elección
+// en el array que la lógica pura ya sabe manejar (construirCliente/actualizarCliente).
+function tiposDesdeFormulario() {
+  const elegido = campoTipo.value;
+  if (elegido === "") return [];                 // «Sin tipo»
+  if (elegido !== "Otros") return [elegido];     // tipo fijo
+  // «Otros»: el texto del campo condicional; vacío → «Otros»
+  const texto = campoTipoOtro.value.trim();
+  if (texto === "") return ["Otros"];
+  // Si el texto coincide con un tipo fijo escrito a mano, se guarda como fijo
+  // (mismo criterio que la lógica añadirTipoLibre, RF-1403)
+  return [texto];
 }
 
-// Clic dentro de los chips: «×» de un chip libre, o alternar un tipo fijo
-contenedorChipsTipos.addEventListener("click", function (evento) {
-  const quitar = evento.target.closest(".chip-quitar");
-  if (quitar) {
-    quitarTipoDelFormulario(quitar.dataset.tipo);
-    return;
-  }
-
-  const chip = evento.target.closest(".chip[data-tipo]");
-  if (!chip) return;
-
-  tiposFormulario = alternarTipoFijo(tiposFormulario, chip.dataset.tipo);
-  pintarChipsTipos();
-
-  // pintarChipsTipos() reconstruye los botones: devolvemos el foco al mismo chip
-  // para que Intro/Espacio seguidos sigan alternándolo (mismo patrón que los
-  // chips del listado de la 012)
-  const repintado = contenedorChipsTipos.querySelector('.chip[data-tipo="' + chip.dataset.tipo + '"]');
-  if (repintado) repintado.focus();
-});
-
-// Quita un tipo libre y ubica el foco en el siguiente chip libre (o en el
-// anterior si era el último): el quitado ya no existe y el foco no debe caer
-// al body; sin libres restantes, vuelve al campo «Añadir otro tipo»
-function quitarTipoDelFormulario(tipo) {
-  const libres = tiposFormulario.filter(function (t) { return !esTipoFijo(t); });
-  const posicion = Math.max(libres.indexOf(tipo), 0);
-
-  tiposFormulario = quitarTipoLibre(tiposFormulario, tipo);
-  pintarChipsTipos();
-
-  const restantes = contenedorChipsTipos.querySelectorAll(".chip-quitar");
-  if (restantes.length > 0) {
-    restantes[Math.min(posicion, restantes.length - 1)].focus();
-  } else {
-    campoTipoOtro.focus();
-  }
-}
-
-botonAnadirTipo.addEventListener("click", anadirTipoDelCampo);
-
-// Intro en el campo añade lo escrito; el preventDefault evita que el Enter
-// dispare el submit del formulario (el input está dentro del <form>)
-campoTipoOtro.addEventListener("keydown", function (evento) {
-  if (evento.key !== "Enter") return;
-  evento.preventDefault();
-  anadirTipoDelCampo();
-});
-
-// Reset del formulario: campos y tipos elegidos (nada obligatorio, spec 007)
+// Reset del formulario: desplegable en «Sin tipo», campo oculto y vacío
+// (nada obligatorio, spec 007)
 function resetearFormulario() {
-  formulario.reset(); // también vacía el campo «Añadir otro tipo»
-  tiposFormulario = [];
-  pintarChipsTipos();
+  formulario.reset(); // también vacía el <select> y el campo condicional
+  alternarCampoOtro();
 }
 
 formulario.addEventListener("submit", function (evento) {
@@ -265,9 +201,9 @@ formulario.addEventListener("submit", function (evento) {
     return;
   }
 
-  // Alta con los chips elegidos (spec 014, RF-1204): la lógica normaliza y
-  // escribe `tipos` + `tipo` = tipos[0] ?? ""
-  clientes.push(construirCliente(datos, Date.now(), Date.now(), tiposFormulario));
+  // Alta con el tipo elegido en el desplegable (spec 016, RF-1403): la lógica
+  // normaliza y escribe `tipos` + `tipo` = tipos[0] ?? ""
+  clientes.push(construirCliente(datos, Date.now(), Date.now(), tiposDesdeFormulario()));
   guardarClientes();
 
   // Alta con feedback (spec 010, RF-801): buscador limpio y aviso «Cliente guardado».
@@ -444,10 +380,23 @@ function iniciarEdicion(id) {
   // Provincia con la única regla de lectura (RF-1302 / T-02): tolera clientes
   // antiguos sin el campo y recorta; nunca `cliente.provincia` a pelo
   formulario.provincia.value = provinciaCliente(cliente);
-  // Tipos del cliente en los chips: fijos marcados y libres con su «×»
-  // (copia nueva: el estado del formulario no debe mutar al cliente)
-  tiposFormulario = tiposCliente(cliente).slice();
-  pintarChipsTipos();
+  // Tipo del cliente en el desplegable (spec 016, RF-1404): primer tipo de
+  // tiposCliente(cliente); si es un tipo fijo → desplegable en ese fijo; si es
+  // libre/«Otros» → desplegable en «Otros» con el texto cargado; vacío → «Sin tipo».
+  // Un multi-tipo importado solo conserva su primer tipo (Decisión 4)
+  const tipos = tiposCliente(cliente);
+  const primero = tipos.length > 0 ? tipos[0] : "";
+  if (esTipoFijo(primero)) {
+    campoTipo.value = primero;       // desplegable en el fijo
+  } else if (primero !== "") {
+    campoTipo.value = "Otros";       // desplegable en «Otros» + texto cargado
+    // El literal «Otros» (guardado por la 008 con el campo vacío) deja el
+    // campo vacío, no el texto «Otros» (RF-1404)
+    campoTipoOtro.value = primero === "Otros" ? "" : primero;
+  } else {
+    campoTipo.value = "";            // «Sin tipo»
+  }
+  alternarCampoOtro();               // oculta el campo si no es «Otros»
   formulario.notas.value = cliente.notas || "";
 
   pintarFormularioModo();
@@ -483,8 +432,8 @@ function guardarEdicion(datos) {
   }
 
   // Actualizamos los campos conservando id y fecha originales (ver logica.js);
-  // los tipos vienen de los chips del formulario (tiposFormulario, RF-1204)
-  clientes = aplicarEdicion(clientes, clienteEditandoId, datos, tiposFormulario);
+  // el tipo viene del desplegable del formulario (tiposDesdeFormulario, RF-1403)
+  clientes = aplicarEdicion(clientes, clienteEditandoId, datos, tiposDesdeFormulario());
   guardarClientes();
 
   clienteEditandoId = null;
@@ -946,7 +895,6 @@ window.addEventListener("offline", pintarLista);
 
 pintarConmutador();
 pintarChips();
-pintarChipsTipos();
 pintarFiltros();
 pintarFiltroProvincia(); // desplegable con las provincias de arranque (RF-1305)
 pintarLista();

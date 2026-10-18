@@ -80,11 +80,11 @@ funcionar sin servidor. La misma web se empaqueta como **aplicación de escritor
 - **Formulario libre y campos nuevos (spec 007)**: nada es obligatorio; la ficha muestra
   «Sin nombre»/«Sin tipo» cuando faltan. Campos **Móvil** y **Código postal** en
   formulario, ficha y buscador; el mapa usa dirección + código postal.
-- ~~Desplegable de tipo con «Otros» (spec 008)~~: el desplegable «Tipo de cliente» y su
-  campo condicional **retirados por la spec 014** — ahora son **chips de selección
-  múltiple** con texto libre sin límite. Sigue vigente lo demás de la 008: los tipos no
-  fijos se agrupan en la pestaña de filtro **Otros** (violeta) y comparten ese color en la
-  ficha; los «Sin tipo» siguen solo en «Todos».
+- ~~Desplegable de tipo con «Otros» (spec 008)~~: retirado por la 014 y **su interfaz
+  restaurada por la spec 016** (ver «Desplegable de tipo (spec 016)» abajo). Sigue
+  vigente lo demás de la 008: los tipos no fijos se agrupan en la pestaña de filtro
+  **Otros** (violeta) y comparten ese color en la ficha; los «Sin tipo» siguen solo en
+  «Todos».
 - **Renombrado FOAM → Espuma (spec 009)**: el valor interno del tipo pasó a «Espuma»
   (HTML, CSS, JS y datos) con migración automática al abrir (`migrarTipos`); además
   cinta de la cabecera a 4 colores, «Correo electrónico» en la ficha y docs al día.
@@ -118,13 +118,10 @@ funcionar sin servidor. La misma web se empaqueta como **aplicación de escritor
   columna «Acciones» ni chrome interactivo—; el `<h2>` de la lista no se imprime (la
   cabecera de contexto ya lo lleva). Sin claves nuevas ni dependencias: es presentación
   pura (`@media print`).
-- **Tipos múltiples (spec 014)**: un cliente admite **varios tipos a la vez**. El
-  formulario usa **chips de selección múltiple** en lugar del desplegable: los tres tipos
-  fijos como casillas generadas desde `TIPOS_FIJOS` (marcado visible con `aria-checked`,
-  no solo color) + campo **«Añadir otro tipo»** para texto libre **sin límite** (el
-  `maxlength="40"` es solo del input; la lógica no trunca), con «×» para quitar cada chip
-  libre; **nada es obligatorio** y la selección vive solo en memoria (**sin claves
-  nuevas**). Los filtros son **por pertenencia**: un multi-tipo sale en cada pestaña de
+- **Tipos múltiples (spec 014)**: un cliente admite **varios tipos a la vez**. *(La
+  interfaz de chips que introdujo aquí **fue sustituida por la spec 016** —desplegable
+  de selección única—; abajo solo queda lo que sigue vigente.)* Los filtros son
+  **por pertenencia**: un multi-tipo sale en cada pestaña de
   sus tipos y en **«Otros»** si tiene tipos libres (los sin tipos solo en «Todos»). La
   tarjeta pinta **un badge por tipo** con el **canto del primer tipo**; el listado y la
   impresión muestran la celda unida («Tela + Espuma»). Se guarda con `tipos` (array) +
@@ -144,6 +141,20 @@ funcionar sin servidor. La misma web se empaqueta como **aplicación de escritor
   «Provincia: X». **Sin claves nuevas** de `localStorage` y **sin escritura de
   migración** (los clientes antiguos sin `provincia` se leen como `""` y no se
   reescriben).
+- **Desplegable de tipo (spec 016)**: la interfaz del formulario de tipos vuelve al
+  patrón de la 008 **sin tocar el modelo de datos de la 014/015**: un **`<select>`
+  «Tipo de cliente»** con 5 opciones — **«Sin tipo»** (vacía, por defecto en alta),
+  **Tela**, **Espuma**, **Estructuras** y **«Otros»** — y un **campo condicional**
+  «Escribe el tipo de cliente» (`placeholder` «p. ej. Toldos», `maxlength="40"` solo
+  en el formulario) que **solo aparece en «Otros»** (oculto con `hidden`, sin espacio,
+  y el texto se **descarta** al cambiar de opción). Mapeo al guardar
+  (`tiposDesdeFormulario()` en `app.js`): «Sin tipo» → `[]`; fijo → `[fijo]`;
+  «Otros» → `[texto]` o `["Otros"]` si vacío/espacios, y si el texto coincide con un
+  fijo se guarda como fijo. Edición: carga el **primer** tipo de `tiposCliente` (el
+  literal «Otros» deja el campo **vacío**); un multi-tipo editado conserva **solo**
+  el tipo elegido (limitación aceptada de la **selección única**). `logica.js` y los
+  tests **intactos** (122/122, cero tests nuevos); los chips del **listado** (spec 012)
+  no cambian.
 
 ## Forma de trabajar (SDD)
 

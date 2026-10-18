@@ -141,27 +141,23 @@ h2 {
   resize: vertical;
 }
 
-/* Título visible de un grupo de controles del formulario (spec 014): mismo
-   aspecto que una etiqueta de campo, pero describe al grupo #chips-tipos
-   (aria-labelledby), no a un control suelto */
-.campo-titulo {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--tinta-media);
-  margin: 0;
+/* Desplegable del tipo de cliente + campo condicional «Otros» (spec 016,
+   RF-1401/1402): el select hereda los estilos de .campo input/textarea */
+.campo select {
+  font: inherit;
+  width: 100%;
+  padding: 12px 14px; /* mínimo 44 px de alto para el pulgar */
+  border: 1px solid var(--linea);
+  border-radius: var(--radio);
+  background: var(--superficie);
+  color: var(--tinta);
+  cursor: pointer;
 }
 
-/* Campo «Añadir otro tipo» + su botón (spec 014, RF-1203): en pantalla
-  estrecha el botón baja a su propia línea (flex-wrap), sin desbordes */
-.anadir-tipo {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.anadir-tipo input {
-  flex: 1 1 180px;
-  min-width: 0; /* el input puede encoger sin forzar scroll horizontal */
+/* Campo condicional: oculto con hidden (no ocupa espacio) salvo al elegir
+   «Otros»; el estado lo alterna app.js (alternarCampoOtro) */
+.campo-condicional[hidden] {
+  display: none;
 }
 
 .acciones-formulario {
@@ -478,64 +474,6 @@ h2 {
   background: #2e3830;
 }
 
-/* ===== Chips del formulario: tipos de cliente (spec 014, RF-1203) ===== */
-
-/* Chip libre: un chip normal (mismas medidas del .chip de la 012) con un
-   botón «×» dentro para quitarlo; al no ser él mismo un botón, no se puede
-   pulsar (solo la «×» actúa) y por eso no lleva cursor de clickeado */
-.chip-libre {
-  padding: 0 2px 0 14px;
-  gap: 2px;
-  max-width: 100%; /* nunca más ancho que el contenedor: el texto se corta */
-  min-width: 0; /* como flex item puede encoger bajo su min-content (nowrap):
-                   el texto se recorta con «…» y la «×» no pierde sus 44 px */
-  cursor: default;
-}
-
-/* Texto del chip libre: en una sola línea y cortado con «…» (el `title`
-   muestra el tipo completo). Sin esto, un tipo de 40+ caracteres empujaría
-   al flex a encoger la «×» por debajo de los 44 px (RF-1203) */
-.chip-texto {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chip-libre:hover {
-  background: var(--superficie); /* sin hover de chip: el clic lo tiene la «×» */
-}
-
-/* «×» de quitar: 44 × 44 px reales (objetivo táctil), redonda y sin borde,
-   heredando el texto del chip; el foco va dentro del chip (outline inset).
-   `flex-shrink: 0` es imprescindible: sin él, el flex del chip la estrecha
-   por debajo de 44 px cuando la etiqueta es larga (reviewer, ronda 1) */
-.chip-quitar {
-  font: inherit;
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border: none;
-  border-radius: 999px;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-}
-
-.chip-quitar:hover {
-  background: var(--linea-suave);
-}
-
-.chip-quitar:focus-visible {
-  outline: 2px solid var(--tinta);
-  outline-offset: -3px;
-}
-
 /* ===== Copia de seguridad (spec 011, RF-901) ===== */
 
 .copia-seguridad {
@@ -677,8 +615,8 @@ h2 {
 /* Un tipo libre puede tener cualquier longitud (RF-1203 no trunca: solo es
    presentación), así que el badge nunca es más ancho que su contenedor: con
    max-width/min-width puede encoger bajo su min-content (nowrap) y el texto
-   se corta con «…» (mismo criterio que .chip-texto y las celdas del listado;
-   el `title` lo lleva completo). Un texto corto no se toca: sin recorte */
+   se corta con «…» (mismo criterio que las celdas del listado; el `title` lo
+   lleva completo). Un texto corto no se toca: sin recorte */
 .etiqueta {
   font-size: 0.75rem;
   font-weight: 700;
