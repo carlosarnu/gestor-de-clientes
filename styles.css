@@ -222,14 +222,15 @@ h2 {
   margin: 0;
 }
 
-/* ===== Impresión del listado (spec 013, RF-1103) ===== */
+/* ===== Impresión del listado (spec 013 → hoja única, spec 017, RF-1503) ===== */
 
-/* La cabecera de contexto existe SOLO para el papel: en pantalla está oculta y
-   T-05 la mostrará dentro de @media print. Uso display:none (no el atributo
-   hidden del HTML) para que el bloque de impresión la active con una regla
-   simple, sin luchar con [hidden] ni !important. El aria-hidden del HTML la
-   saca también de lectores: en pantalla el estado real lo dan el contador y
-   los estados vacíos */
+/* La cabecera de contexto existe SOLO para la hoja: en pantalla está oculta y la
+   muestra hoja-impresion.css (enlazada con media="print"; la vista previa conmuta
+   ese media a "all"). Uso display:none (no el atributo hidden del HTML) para que
+   la hoja la active con una regla simple, sin luchar con [hidden] ni !important.
+   SIN aria-hidden: en pantalla display:none ya la excluye del árbol de
+   accesibilidad, y en la vista previa queda legible para lectores de pantalla
+   (RF-1503; decisión 3.3 del plan de la 017) */
 .cabecera-impresion {
   display: none;
 }
@@ -909,19 +910,24 @@ h2 {
    impreso lo decide el papel, no la ventana, así que EN PAPEL el listado sale
    SIEMPRE como tabla con su thead, aunque la pantalla mida 375 px (Decisión 2
    del plan: se restringe aquí en vez de duplicar todas estas reglas dentro de
-   @media print, que divergirían con cada cambio de la 012) */
+   @media print, que divergirían con cada cambio de la 012).
+   En la spec 017 el prefijo body:not(.modo-vista-previa) (plan §3.2) hace que
+   TAMBIÉN en pantalla con la vista previa abierta el listado vuelva a su estilo
+   base de tabla, igual que en papel: si no, a 375 px el apilado desviaría la
+   hoja de su definición. Cada selector lleva el prefijo; las reglas NO se
+   duplican (RF-1510). */
 @media screen and (max-width: 768px) {
-  .listado,
-  .listado tbody,
-  .listado tr,
-  .listado td {
+  body:not(.modo-vista-previa) .listado,
+  body:not(.modo-vista-previa) .listado tbody,
+  body:not(.modo-vista-previa) .listado tr,
+  body:not(.modo-vista-previa) .listado td {
     display: block;
     width: auto;
   }
 
   /* La cabecera se conserva para lectores de pantalla, pero visualmente cada
      celda lleva su etiqueta (data-etiqueta) sobre el valor */
-  .listado thead {
+  body:not(.modo-vista-previa) .listado thead {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -929,11 +935,11 @@ h2 {
     clip-path: inset(50%);
   }
 
-  .listado {
+  body:not(.modo-vista-previa) .listado {
     border: none;
   }
 
-  .listado tr {
+  body:not(.modo-vista-previa) .listado tr {
     margin-bottom: 10px;
     background: var(--superficie);
     border: 1px solid var(--linea);
@@ -941,13 +947,13 @@ h2 {
     border-radius: 8px;
   }
 
-  .listado td {
+  body:not(.modo-vista-previa) .listado td {
     display: block;
     padding: 8px 12px;
     border-bottom: 1px dashed var(--linea-suave);
   }
 
-  .listado td::before {
+  body:not(.modo-vista-previa) .listado td::before {
     content: attr(data-etiqueta);
     display: block;
     margin-bottom: 2px;
@@ -957,31 +963,31 @@ h2 {
   }
 
   /* La celda de acciones no lleva etiqueta (sus botones se explican solos) */
-  .listado .acciones-celda::before {
+  body:not(.modo-vista-previa) .listado .acciones-celda::before {
     content: none;
   }
 
   /* En bloque, la marca de edición rodea la fila entera (la tarjeta-fila),
      no celda a celda; el canto de color del tipo se conserva como en .tarjeta */
-  .listado .fila.editando {
+  body:not(.modo-vista-previa) .listado .fila.editando {
     border-top-color: var(--tinta);
     border-right-color: var(--tinta);
     border-bottom-color: var(--tinta);
   }
 
-  .listado .fila.editando td {
+  body:not(.modo-vista-previa) .listado .fila.editando td {
     border-top: none;
     border-bottom: 1px dashed var(--linea-suave);
     background: transparent;
   }
 
-  .listado .fila.editando td:last-child {
+  body:not(.modo-vista-previa) .listado .fila.editando td:last-child {
     border-right: none;
     border-bottom: none;
   }
 
-  .listado tbody tr:last-child td,
-  .listado td:last-child {
+  body:not(.modo-vista-previa) .listado tbody tr:last-child td,
+  body:not(.modo-vista-previa) .listado td:last-child {
     border-bottom: none;
   }
 }
@@ -1061,108 +1067,75 @@ h2 {
   }
 }
 
-/* ===== Impresión del listado (spec 013, RF-1103) ===== */
+/* ===== Barra de la vista previa de impresión (spec 017, RF-1504) — SOLO PANTALLA ===== */
 
-/* Solo papel: se imprime lo que se ve (vista actual + filtro + búsqueda + campos
-   elegidos), sin el chrome interactivo/decorativo de la aplicación. TODO va dentro
-   de @media print: en pantalla no cambia absolutamente nada. El ancho de lo
-   impreso lo decide el papel, no la pantalla (T-06 ajusta columnas, cortes de
-   página y texto completo de celdas). No se fuerzan fondos: el papel se queda con
-   negro sobre blanco; los cantos de color de las tarjetas los imprime el navegador
-   si el usuario habilita los fondos en su diálogo. Se imprime la cabecera de
-   contexto de arriba; el <h2> «Clientes» de la lista NO (Decisión 10 de la spec:
-   en papel basta la cabecera de contexto «Gestor de Clientes · …») */
+/* Estilos base de la barra (T-04 añade el <div hidden> con sus tres botones,
+   que usan .boton-principal/.boton-secundario de siempre: ≥44 px y foco
+   visible). Fuera de la vista previa la oculta el atributo hidden (patrón 016,
+   ganando al display:flex con mayor especificidad); en la vista previa se ve;
+   en el papel (papel o PDF) la oculta la regla mecánica #barra-vista-previa del
+   @media print de más abajo. No es regla de hoja: no viaja a hoja-impresion.css
+   (Decisión 9 del plan) */
+.barra-vista-previa {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.barra-vista-previa[hidden] {
+  display: none;
+}
+
+/* En la barra los tres botones conviven en una fila: se anula el width:100% del
+   .boton-principal (pensado para el formulario, donde va solo en su línea) y el
+   flex-wrap de la barra los baja de línea a 375 px sin desbordar (≥44 px en las
+   dos disposiciones, gracias al padding de 12 px) */
+.barra-vista-previa .boton-principal {
+  width: auto;
+}
+
+/* Estado del «Guardar como PDF» (T-05, RF-1506): aviso EN LÍNEA dentro de la
+   barra — el toast de siempre es chrome y la hoja lo oculta en la vista previa
+   (RF-1501), así que este <p> es el que hace visible el resultado («PDF
+   guardado…» / «No se pudo generar el PDF») mientras la previa siga abierta.
+   flex-basis 100% lo baja a su propia línea tras los botones; sin clase de
+   error va en tinta normal, con .estado-vp-error en el rojo de siempre */
+.barra-vista-previa .estado-vp {
+  flex-basis: 100%;
+  margin: 0;
+  font-weight: 600;
+}
+
+.barra-vista-previa .estado-vp[hidden] {
+  display: none;
+}
+
+.barra-vista-previa .estado-vp-error {
+  color: var(--peligro);
+}
+
+/* ===== Impresión del listado (spec 013 → hoja única conmutable, spec 017) ===== */
+
+/* SOLO reglas MECÁNICAS del papel (RF-1510): no cambian la apariencia de la
+   hoja, solo su comportamiento de paginación y la exclusión de la barra. Las
+   reglas VISUALES (chrome oculto, cabecera de contexto, texto completo, una
+   columna…) viven ahora en hoja-impresion.css — enlazado con media="print"
+   DESPUÉS de styles.css, de modo que cada declaración está escrita UNA sola vez
+   y la condición la da el medio del enlace (papel = estado por defecto; la
+   vista previa de T-04 conmuta ese media a "all"). En pantalla, fuera de la
+   vista previa, NADA de este bloque aplica (media print no hace match con
+   screen), igual que siempre. Se imprime lo que se ve (vista actual + filtro +
+   búsqueda + campos elegidos); no se fuerzan fondos: el papel se queda con negro
+   sobre blanco y los cantos de color los imprime el navegador si el usuario
+   habilita los fondos en su diálogo. */
 @media print {
-  /* Chrome de la aplicación: cabecera decorativa con cinta, formulario completo,
-     título «Clientes» de la lista, pestañas de filtro, buscador, conmutador,
-     contador «N clientes», botones («Imprimir», Exportar/Importar), confirmación
-     en línea de la importación, selector de campos (chips y su título «Campos
-     del listado»), acciones de tarjeta («Editar»/«Eliminar»), «¿Seguro? · Sí,
-     eliminar / No», TODA la columna «Acciones» del listado (el th y los td
-     comparten .acciones-celda), mapa (iframe y enlace «Ver en Google Maps») y
-     toast */
-  .cabecera,
-  .lista-cabecera h2,
-  #panel-formulario,
-  .filtros,
-  .filtro-provincia-bloque,
-  .buscador,
-  .conmutador,
-  .contador,
-  #boton-imprimir,
-  .copia-seguridad,
-  .confirmacion-importacion,
-  .selector-campos,
-  .tarjeta-acciones,
-  .confirmacion,
-  .acciones-celda,
-  .mapa-caja,
-  .toast {
-    display: none;
-  }
-
-  /* Cabecera de contexto (spec 013): existe solo para el papel y aquí se ve, con
-     tipografía de título un punto menor que el <h2> de la lista (que en papel
-     NO se imprime: arriba queda oculto y la sustituye esta cabecera) */
-  .cabecera-impresion {
-    display: block;
-    font-size: 1.05rem;
-    font-weight: 700;
-    margin: 0 0 4px;
-  }
-
-  /* La marca de edición es de pantalla (RF-1003): en papel el cliente sale con
-     sus datos y sin marcas. Se restauran los bordes/tinte de una tarjeta o fila
-     normal, conservando el canto de color del tipo */
-  .tarjeta.editando {
-    border-top-color: var(--linea);
-    border-right-color: var(--linea);
-    border-bottom-color: var(--linea);
-    box-shadow: none;
-  }
-
-  .listado .fila.editando td {
-    border-top: none;
-    border-bottom: 1px solid var(--linea-suave);
-    background: none;
-  }
-
-  .listado .fila.editando td:last-child {
-    border-right: none;
-  }
-
-  /* ===== Papel: tabla siempre, una columna y paginación (spec 013, RF-1103) ===== */
-
-  /* El ancho de lo impreso lo decide el PAPEL: el listado sale SIEMPRE como
-     tabla con su cabecera de columnas visible y repetida en cada página (el
-     bloque apilado de la 012 está restringido a screen, ahí arriba) */
+  /* El ancho de lo impreso lo decide el PAPEL: la cabecera de columnas se
+     repite en cada página (el listado sale SIEMPRE como tabla con su thead;
+     el bloque apilado de la 012 está restringido a screen, ahí arriba) */
   .listado thead {
     display: table-header-group;
-  }
-
-  /* Sin «…» en papel: el valor de las celdas sale COMPLETO (Decisión 8: el
-     corte con «…» y el title son recursos de pantalla) */
-  .listado th,
-  .listado td {
-    white-space: normal;
-    overflow: visible;
-    text-overflow: clip;
-  }
-
-  /* El badge del tipo sigue la misma regla de pantalla (Decisión 8): en papel
-     su texto sale completo y sin límite de ancho (lo decide el papel) */
-  .etiqueta {
-    max-width: none;
-    white-space: normal;
-    overflow: visible;
-    text-overflow: clip;
-  }
-
-  /* Tarjetas en UNA sola columna: se anulan las 2/3 columnas de los bloques
-     min-width (misma especificidad, pero este bloque va al final del fichero
-     y gana por orden) */
-  .lista-clientes {
-    grid-template-columns: 1fr;
   }
 
   /* Paginación: ni tarjeta ni fila se cortan entre páginas; la cabecera de la
@@ -1171,5 +1144,12 @@ h2 {
   .listado tr {
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+
+  /* La barra de la vista previa (spec 017) es pantalla, no hoja: nunca viaja al
+     papel ni al PDF (RF-1504), aunque la vista previa esté abierta (media="all"
+     del enlace hace match también en impresión, y esta regla la excluye) */
+  #barra-vista-previa {
+    display: none;
   }
 }

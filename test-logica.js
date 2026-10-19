@@ -30,6 +30,7 @@ const {
   esTipoFijo,
   migrarTipos,
   nombreArchivoExportacion,
+  nombreArchivoPdf,
   CATALOGO_CAMPOS,
   normalizarSeleccion,
   alternarCampo,
@@ -373,6 +374,15 @@ test("nombreArchivoExportacion usa la fecha LOCAL con ceros (RF-905)", () => {
   assert.equal(nombreArchivoExportacion(new Date(2026, 11, 31)), "clientes-2026-12-31.json");
   // Pasada la medianoche local el día es el LOCAL (con UTC se adelantaría al día anterior)
   assert.equal(nombreArchivoExportacion(new Date(2026, 0, 1, 0, 30)), "clientes-2026-01-01.json");
+});
+
+// ===== vista previa de impresión y PDF (spec 017) =====
+
+test("nombreArchivoPdf usa la fecha LOCAL con ceros (RF-1512)", () => {
+  assert.equal(nombreArchivoPdf(new Date(2026, 0, 5)), "listado-2026-01-05.pdf");
+  assert.equal(nombreArchivoPdf(new Date(2026, 11, 31)), "listado-2026-12-31.pdf");
+  // Pasada la medianoche local el día es el LOCAL (con UTC se adelantaría)
+  assert.equal(nombreArchivoPdf(new Date(2026, 0, 1, 0, 30)), "listado-2026-01-01.pdf");
 });
 
 test("importarClientes con JSON inválido da error y clientes null (RF-905)", () => {

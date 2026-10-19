@@ -415,6 +415,20 @@ function nombreArchivoExportacion(fecha) {
   );
 }
 
+// Nombre del PDF de la vista previa: "listado-AAAA-MM-DD.pdf" (RF-1512).
+// Espejo de nombreArchivoExportacion con otro prefijo y extensión: fecha LOCAL
+// (getMonth/getDate) con dosDigitos, nunca toISOString (UTC adelantaría el día).
+// Recibe un Date inyectado por el llamante (app.js pasa new Date()).
+function nombreArchivoPdf(fecha) {
+  return (
+    "listado-" +
+    fecha.getFullYear() +
+    "-" + dosDigitos(fecha.getMonth() + 1) +
+    "-" + dosDigitos(fecha.getDate()) +
+    ".pdf"
+  );
+}
+
 // ¿Es un número de verdad (no NaN ni Infinity)? Para conservar id y fecha importados
 function esNumero(valor) {
   return typeof valor === "number" && isFinite(valor);
@@ -624,6 +638,7 @@ if (typeof module !== "undefined" && module.exports) {
     esTipoFijo,
     migrarTipos,
     nombreArchivoExportacion,
+    nombreArchivoPdf,
     importarClientes,
     dosDigitos,
     escaparAtributo,

@@ -41,6 +41,10 @@
       {
         "from": "../logica.js",
         "to": "logica.js"
+      },
+      {
+        "from": "../hoja-impresion.css",
+        "to": "hoja-impresion.css"
       }
     ],
     "win": {

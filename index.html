@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gestor de Clientes</title>
   <link rel="stylesheet" href="styles.css">
+  <!-- Hoja de impresión (spec 017, RF-1510/RF-1511): media="print" = el papel es
+       su estado por defecto (Ctrl+P funciona aunque la vista previa nunca se
+       haya abierto); la vista previa (app.js, T-04) conmuta este media a "all"
+       mientras dura. Va DESPUÉS de styles.css para ganar por orden de cascada a
+       igual especificidad (cabecera-impresion, lista-clientes a 1 columna) -->
+  <link rel="stylesheet" href="hoja-impresion.css" media="print" id="estilo-hoja">
 </head>
 <body>
 
@@ -160,10 +166,33 @@
 
     <!-- Lista de clientes -->
     <section class="panel">
-      <!-- Cabecera de contexto impresa (spec 013, RF-1103): existe SOLO para el
-           papel; en pantalla está oculta (styles.css) y el texto lo rellena app.js
-           en el evento «beforeprint», al imprimir -->
-      <p class="cabecera-impresion" id="cabecera-impresion" aria-hidden="true"></p>
+      <!-- Barra de la vista previa de impresión (spec 017, RF-1504): SOLO se ve
+           con la vista previa abierta (hidden por defecto; la alterna app.js y en
+           el papel/PDF la oculta la regla mecánica del @media print de styles.css).
+           Es SCREEN: no es regla de hoja y no viaja a hoja-impresion.css (Decisión
+           9 del plan). Tres botones en español con las clases de siempre
+           (.boton-principal / .boton-secundario: ≥44 px y foco visible); el foco al
+           abrir cae en el primero, «Imprimir» (RF-1504). El <p> de estado es el
+           aviso del «Guardar como PDF» en escritorio (RF-1506): el toast de
+           siempre es CHROME y la hoja lo oculta en la vista previa (RF-1501), así
+           que el resultado («PDF guardado…» / «No se pudo generar el PDF») se
+           muestra AQUÍ, dentro de la propia vista previa; lo vacía app.js al
+           cerrar. role="status" para que lectores de pantalla lo anuncien -->
+      <div class="barra-vista-previa" id="barra-vista-previa" hidden>
+        <button type="button" class="boton-principal" id="boton-vp-imprimir">Imprimir</button>
+        <button type="button" class="boton-secundario" id="boton-vp-pdf">Guardar como PDF</button>
+        <button type="button" class="boton-secundario" id="boton-vp-cerrar">Cerrar</button>
+        <p class="estado-vp" id="estado-vp" role="status" hidden></p>
+      </div>
+
+      <!-- Cabecera de contexto de la hoja (spec 013, RF-1103 → spec 017, RF-1503):
+           existe SOLO para la hoja; en pantalla está oculta (styles.css) y la
+           muestra hoja-impresion.css (media="print" / vista previa). El texto lo
+           rellena app.js fresco en «beforeprint» (Ctrl+P, RF-1509) y al abrir la
+           vista previa. SIN aria-hidden: display:none ya la saca de lectores en
+           pantalla y en la vista previa queda legible (RF-1503; decisión 3.3 del
+           plan de la 017) -->
+      <p class="cabecera-impresion" id="cabecera-impresion"></p>
 
       <div class="lista-cabecera">
         <h2>Clientes</h2>

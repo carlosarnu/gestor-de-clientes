@@ -14,7 +14,9 @@ funcionar sin servidor. La misma web se empaqueta como **aplicación de escritor
   única es `Documentos\Gestor de Clientes\clientes.json` (mismo array; `localStorage`
   solo en la web).
 - `index.html` (estructura), `styles.css` (estilos), `app.js` (interfaz y estado),
-  `logica.js` (lógica pura, sin DOM ni localStorage). El orden de los `<script>` importa:
+  `logica.js` (lógica pura, sin DOM ni localStorage) y `hoja-impresion.css` (la hoja
+  de papel y vista previa: enlazada con `media="print"` y conmutada a `all` mientras
+  la vista previa está abierta; spec 017). El orden de los `<script>` importa:
   `logica.js` se carga **antes** que `app.js`, que usa sus funciones globales
   (`filtrarClientes`, `buscarClientes`, `claseTipo`…).
 - Tests: archivos `test-*.js` con el runner nativo de Node (`node --test`).
@@ -117,7 +119,7 @@ funcionar sin servidor. La misma web se empaqueta como **aplicación de escritor
   en una sola columna y sin cortes entre páginas, texto completo sin «…», sin mapa, sin
   columna «Acciones» ni chrome interactivo—; el `<h2>` de la lista no se imprime (la
   cabecera de contexto ya lo lleva). Sin claves nuevas ni dependencias: es presentación
-  pura (`@media print`).
+  pura (`@media print`). **Dos puntos derogados por la 017**: el botón ya no llama a `window.print()` directamente (abre la vista previa) y la app de escritorio **sí** genera el PDF; la guardia de cero visibles, la cabecera de contexto en `beforeprint` y la hoja limpia siguen intactas (ahora en `hoja-impresion.css`).
 - **Tipos múltiples (spec 014)**: un cliente admite **varios tipos a la vez**. *(La
   interfaz de chips que introdujo aquí **fue sustituida por la spec 016** —desplegable
   de selección única—; abajo solo queda lo que sigue vigente.)* Los filtros son
@@ -155,6 +157,25 @@ funcionar sin servidor. La misma web se empaqueta como **aplicación de escritor
   el tipo elegido (limitación aceptada de la **selección única**). `logica.js` y los
   tests **intactos** (122/122, cero tests nuevos); los chips del **listado** (spec 012)
   no cambian.
+- **Vista previa de impresión y PDF (spec 017)**: el botón **«Imprimir»** ya no abre el
+  diálogo del navegador (deroga el RF-1102 de la 013): abre una **vista previa dentro
+  de la app** (clase `modo-vista-previa` en `<body>` + `#estilo-hoja` conmutado de
+  `media="print"` a `"all"`) con la hoja tal como saldrá. **Barra**
+  `#barra-vista-previa` con **«Imprimir»** (mismo `window.print()`), **«Guardar como
+  PDF»** —web: también `window.print()`; escritorio: IPC **asíncrono** `guardar-pdf`
+  (`dialog.showSaveDialog` → `webContents.printToPDF` A4 con fondos →
+  `fs.writeFile`) que guarda **`listado-AAAA-MM-DD.pdf`** con fecha **local**— y
+  **«Cerrar»** (Escape también); al cerrar se restauran filtro, búsqueda, vista, scroll
+  y foco (`focus({preventScroll:true})`). Guardia de la 013 intacta: con cero visibles
+  no se abre nada. La hoja de **los dos caminos** de impresión (vista previa y
+  Ctrl+P/imprimir nativo) vive en **`hoja-impresion.css`** (cada regla visual una sola
+  vez; `styles.css` solo conserva 3 reglas mecánicas dentro de su `@media print`); el
+  apilado móvil va con prefijo `body:not(.modo-vista-previa)`. Los avisos de PDF van en
+  el `<p id="estado-vp">` de la barra (el toast lo oculta la hoja con la previa
+  abierta): «PDF guardado: nombre» / «No se pudo generar el PDF» con la vista previa
+  abierta. `logica.js` solo añade **`nombreArchivoPdf(fecha)`** → **123 tests**. Sin
+  claves nuevas de `localStorage` y JSON de clientes byte-idéntico al imprimir o
+  guardar PDF.
 
 ## Forma de trabajar (SDD)
 

@@ -1,11 +1,12 @@
 // =====================================================
 // Gestor de Clientes - Proceso principal de escritorio (spec 011, RF-902)
 // =====================================================
-// Proceso principal fino: solo crea la ventana y atiende el IPC síncrono de
-// lectura/escritura del archivo de clientes. Toda la lógica de la app vive
-// en la web de la raíz (index.html, app.js, logica.js), que aquí solo se carga.
+// Proceso principal fino: crea la ventana, atiende el IPC síncrono de
+// lectura/escritura del archivo de clientes (spec 011) y el IPC ASÍNCRONO de
+// guardado del PDF de la hoja (spec 017, RF-1506). Toda la lógica de la app
+// vive en la web de la raíz (index.html, app.js, logica.js), que aquí se carga.
 
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("path");
 const fs = require("fs");
 
@@ -86,6 +87,71 @@ ipcMain.on("gestor-datos:escribir", (event, contenido) => {
   } catch (error) {
     event.returnValue = {
       error: error && error.message ? error.message : String(error),
+    };
+  }
+});
+
+// =====================================================
+// IPC ASÍNCRONO: guardar el PDF de la hoja (spec 017, RF-1506)
+// =====================================================
+// Los IPC síncronos de la 011 no sirven aquí: showSaveDialog y printToPDF son
+// PROMESAS. Contrato de resultado (igual que el de la 011 pero como promesa):
+//   { guardado: true, ruta } | { cancelado: true } | { error: "<mensaje>" }
+// Recorrido: PRIMERO el diálogo de guardado, DESPUÉS el PDF — cancelar no gasta
+// la generación y la convención de los diálogos nativos es no avisar al hacerlo.
+// El nombre por defecto lo calcula el renderer con nombreArchivoPdf (lógica
+// pura testada, RF-1512); aquí solo se confía su basename (defensa: el proceso
+// principal no acepta rutas del renderer, solo un nombre de fichero).
+// clientes.json NO se lee ni se escribe: el PDF es presentación pura (RF-1511).
+ipcMain.handle("gestor-datos:guardar-pdf", async (event, nombreArchivo) => {
+  const ventana = BrowserWindow.fromWebContents(event.sender);
+
+  // Carpeta propuesta: la de los datos (Documentos\Gestor de Clientes), creada
+  // si no existe (cubre el flujo web→app donde aún no hay clientes.json); si
+  // no se pudiera crear, se propone la carpeta de Documentos del usuario.
+  const carpeta = path.dirname(rutaArchivoClientes());
+  try {
+    fs.mkdirSync(carpeta, { recursive: true });
+  } catch (error) {
+    // Se propone app.getPath("documents") más abajo
+  }
+  const carpetaPropuesta = fs.existsSync(carpeta) ? carpeta : app.getPath("documents");
+
+  // Solo un basename defensivo: un nombre vacío cae a «listado.pdf»
+  const nombre = path.basename(String(nombreArchivo || "")) || "listado.pdf";
+
+  try {
+    const respuesta = await dialog.showSaveDialog(ventana, {
+      defaultPath: path.join(carpetaPropuesta, nombre),
+      filters: [{ name: "PDF", extensions: ["pdf"] }],
+    });
+
+    // Usuario canceló (o cerró el cuadro): sin escribir nada y sin aviso
+    if (respuesta.canceled || !respuesta.filePath) {
+      return { cancelado: true };
+    }
+
+    // A4 como el papel del navegador (Decisión 7 de la 017). printBackground:
+    // TRUE — aquí NO hay usuario que active «Gráficos de fondo» como en el
+    // diálogo del navegador de la 013: la generación es silente y sin opción,
+    // así que para que el PDF sea fiel a la hoja de la vista previa (RF-1506,
+    // «mismo contenido que la vista previa») los fondos (badges de tipo,
+    // tintes) deben salir sí o sí. Decisión de la T-05 documentada en el acta.
+    const datos = await ventana.webContents.printToPDF({
+      pageSize: "A4",
+      printBackground: true,
+    });
+
+    // Escritura con fs.promises (handler async, no se bloquea el proceso
+    // principal); un fallo (ruta no writable, disco lleno…) cae al catch y se
+    // devuelve { error } para que el renderer avise en la barra de la previa
+    await fs.promises.writeFile(respuesta.filePath, datos);
+
+    return { guardado: true, ruta: respuesta.filePath };
+  } catch (error) {
+    return {
+      error: "No se pudo generar el PDF: " +
+        (error && error.message ? error.message : String(error)),
     };
   }
 });

@@ -35,9 +35,24 @@ const textoConfirmacionImportar = document.getElementById("confirmacion-importac
 const botonReemplazar = document.getElementById("boton-reemplazar");
 const botonCancelarImportacion = document.getElementById("boton-cancelar-importacion");
 
-// Impresión del listado (spec 013, RF-1101/RF-1103)
+// Impresión del listado (spec 013, RF-1101/RF-1103 → spec 017, RF-1501)
 const botonImprimir = document.getElementById("boton-imprimir");
 const cabeceraImpresion = document.getElementById("cabecera-impresion");
+
+// Vista previa de impresión (spec 017, RF-1501/RF-1504): la hoja conmutable y su
+// barra. estiloHoja es el <link id="estilo-hoja" media="print"> de index.html:
+// su atributo media es el conmutador entre papel y pantalla-con-vista-previa
+// (fuente única de reglas, RF-1510)
+const estiloHoja = document.getElementById("estilo-hoja");
+const barraVistaPrevia = document.getElementById("barra-vista-previa");
+const botonVpImprimir = document.getElementById("boton-vp-imprimir");
+const botonVpPdf = document.getElementById("boton-vp-pdf");
+const botonVpCerrar = document.getElementById("boton-vp-cerrar");
+// Aviso del «Guardar como PDF» en escritorio (RF-1506): el toast es chrome y la
+// hoja lo oculta en la vista previa (RF-1501), así que el resultado se muestra
+// EN LÍNEA en la barra (parte de la vista previa, no chrome). Resolución de la
+// contradicción RF-1501/RF-1506 documentada en la T-05.
+const estadoVp = document.getElementById("estado-vp");
 
 // Conmutador de vista y selector de campos (spec 012, RF-1001/RF-1002)
 const conmutador = document.getElementById("conmutador");
@@ -65,6 +80,12 @@ let clienteEditandoId = null; // id del cliente en edición, o null si no se est
 let confirmandoEliminarId = null; // id de la tarjeta mostrando "¿Seguro?", o null si no hay ninguna
 let importacionPendiente = null; // clientes del fichero esperando confirmación, o null
 let temporizadorAviso = null;
+// Vista previa de impresión (spec 017): SOLO en memoria, sin persistencia — abrir
+// o cerrarla no escribe ninguna clave ni cambia clientes (RF-1511). scrollAntes
+// guarda la posición de la página al abrir para restaurarla al cerrar (RF-1504,
+// Decisión 11)
+let vistaPreviaAbierta = false;
+let scrollAntesVistaPrevia = 0;
 
 // =====================================================
 // Guardar y cargar datos
@@ -621,33 +642,149 @@ botonCancelarImportacion.addEventListener("click", function () {
   ocultarConfirmacionImportacion();
 });
 
-// «Imprimir» (spec 013, RF-1101/RF-1102): con clientes visibles abre el diálogo
-// nativo del navegador (window.print(), permitido: la prohibición constitucional es
-// confirm()/alert()); con CERO visibles (lista vacía, filtro sin resultados o
-// búsqueda sin coincidencias), aviso breve y SIN diálogo. El guardia es SOLO del
-// botón: Ctrl+P / menú «Imprimir…» del navegador no se intercepta. No toca datos,
-// claves, vista, filtro ni búsqueda.
+// =====================================================
+// Vista previa de impresión (spec 017, RF-1501…RF-1505)
+// =====================================================
+
+// Cabecera de contexto de la hoja (spec 013, RF-1103 → spec 017, RF-1503): una
+// ÚNICA helper para las dos rutas que la necesitan — el listener «beforeprint»
+// (Ctrl+P / menú del navegador, RF-1509, y también toda impresión lanzada desde la
+// vista previa) y la apertura de la vista previa, para que la cabecera ya esté
+// fresca al mostrarse sin depender de un evento que Electron no garantiza con
+// printToPDF (plan §3.4). Tercer argumento (spec 015, RF-1308): el filtro de
+// provincia vigente; sin provincia activa textoContextoImpresion omite la pieza.
+// textContent pinta seguro, sin innerHTML.
+function refrescarCabeceraImpresion() {
+  cabeceraImpresion.textContent = textoContextoImpresion(filtroActivo, textoBusqueda, filtroProvincia);
+}
+
+window.addEventListener("beforeprint", refrescarCabeceraImpresion);
+
+// «Imprimir» de la cabecera de la lista (spec 013, RF-1101 → spec 017, RF-1501):
+// la GUARDIA de cero visibles queda idéntica (RF-1502 — vacío, filtro, provincia o
+// búsqueda sin resultados → aviso breve y SIN abrir nada, sin disparar
+// beforeprint); con visibles YA NO llama a window.print(): abre la vista previa
+// dentro de la propia app (derogación del RF-1102, Decisión 1 de la 017). No toca
+// datos, claves, vista, filtro ni búsqueda.
 botonImprimir.addEventListener("click", function () {
   if (visiblesActuales().length === 0) {
     pintarAviso("No hay clientes para imprimir");
     return;
   }
+  abrirVistaPrevia();
+});
+
+// Abre la vista previa (RF-1501): es un ESTADO de la página, no un documento
+// nuevo ni un clon — se muestra el MISMO HTML en vivo de la lista, con el chrome
+// oculto por las reglas de hoja-impresion.css cuyo <link> se enciende en pantalla
+// conmutando su media de "print" a "all" (RF-1510: un único juego de reglas para
+// pantalla-con-vista-previa y papel, imposible que divergan). Orden fijado por el
+// plan §1: barra.hidden = false ANTES del focus() (con hidden el botón no podría
+// recibir foco). La cabecera de contexto se rellena fresca al abrir (RF-1503).
+// Presentación pura: no escribe clientes ni claves y no altera filtro, búsqueda,
+// provincia, vista ni selección de campos (instantánea, RF-1501/Decisión 8).
+function abrirVistaPrevia() {
+  if (vistaPreviaAbierta) return;
+  scrollAntesVistaPrevia = window.scrollY;
+  refrescarCabeceraImpresion();
+  vistaPreviaAbierta = true;
+  document.body.classList.add("modo-vista-previa");
+  estiloHoja.media = "all";
+  barraVistaPrevia.hidden = false;
+  estadoVp.hidden = true; // sin restos del PDF de una apertura anterior
+  estadoVp.textContent = "";
+  botonVpImprimir.focus(); // foco al PRIMER botón, «Imprimir» (RF-1504)
+}
+
+// Cierra la vista previa y devuelve la app a su estado anterior EXACTO (RF-1504):
+// filtro, búsqueda, provincia, vista y campos intactos (no se tocaron al abrir),
+// posición de scroll restaurada (Decisión 11) y foco de vuelta en el botón
+// «Imprimir» de la lista. El papel recupera su estado por defecto (media="print"):
+// Ctrl+P vuelve a imprimir la hoja aunque la vista previa no se reabra (RF-1509).
+function cerrarVistaPrevia() {
+  if (!vistaPreviaAbierta) return;
+  vistaPreviaAbierta = false;
+  barraVistaPrevia.hidden = true;
+  estadoVp.hidden = true; // el aviso del PDF desaparece con la barra (RF-1506)
+  estadoVp.textContent = "";
+  estiloHoja.media = "print";
+  document.body.classList.remove("modo-vista-previa");
+  window.scrollTo(0, scrollAntesVistaPrevia);
+  // preventScroll: focus() por defecto llevaria el boton a la vista y
+  // arruinaria la restauracion del scroll (RF-1504 pide las DOS cosas)
+  botonImprimir.focus({ preventScroll: true });
+}
+
+// Escape cierra la vista previa (RF-1504). Listener ÚNICO y permanente que solo
+// reacciona a Escape y solo con la vista previa abierta: no se intercepta ninguna
+// otra tecla ni Ctrl+P (Decisión 4 de la spec; la 013 queda intacta). El cuadro
+// nativo de impresión consume su propio Escape sin que llegue a la página, así que
+// cancelarlo NO cierra la vista previa (RF-1505, caso límite de la spec).
+window.addEventListener("keydown", function (evento) {
+  if (evento.key !== "Escape" || !vistaPreviaAbierta) return;
+  cerrarVistaPrevia();
+});
+
+// «Imprimir» de la barra (RF-1505): el diálogo nativo con la hoja ya encendida
+// (media="all" hace match también en impresión, Decisión 5 del plan) y SIN cerrar
+// la vista previa: cancelar o cerrar el diálogo deja todo tal cual (Decisión 8);
+// beforeprint rellena la cabecera fresca, igual que con Ctrl+P (coherencia).
+botonVpImprimir.addEventListener("click", function () {
   window.print();
 });
 
-// Cabecera de contexto impresa (spec 013, RF-1103, plan §5): se rellena SIEMPRE en
-// el propio momento de imprimir. El navegador dispara «beforeprint» con la ruta del
-// botón (window.print()) Y con la ruta nativa (Ctrl+P / menú «Imprimir…»), así que
-// una única escucha cubre las dos con el texto fresco del filtro y la búsqueda
-// vigentes (Decisión 12 de la spec). No se rellena también en el clic del botón:
-// sería duplicar el cálculo sin añadir nada (beforeprint se dispara antes de
-// capturar la hoja). textContent pinta seguro, sin innerHTML.
-// Tercer argumento (spec 015, RF-1308): el filtro de provincia vigente; sin
-// provincia activa `textoContextoImpresion` omite la pieza y el texto es
-// idéntico al anterior (firma opcional compatible).
-window.addEventListener("beforeprint", function () {
-  cabeceraImpresion.textContent = textoContextoImpresion(filtroActivo, textoBusqueda, filtroProvincia);
+// «Guardar como PDF» (RF-1506 escritorio / RF-1507 web). En escritorio la T-05
+// expone el IPC guardar-pdf (escritorio/main.js + preload.js) con nombre
+// `listado-AAAA-MM-DD.pdf`; si un puente más antiguo no lo expone, caemos al
+// MISMO window.print() que «Imprimir», que es además literalmente lo que la
+// spec pide en la web (RF-1507: el navegador ofrece «Guardar como PDF» como
+// destino y allí el nombre lo propone el navegador).
+botonVpPdf.addEventListener("click", function () {
+  if (EN_ESCRITORIO && typeof window.gestorDatos.guardarPdf === "function") {
+    guardarComoPdfEscritorio();
+    return;
+  }
+  window.print();
 });
+
+// Ruta de escritorio (RF-1506), activa con el IPC de la T-05 (main.js +
+// preload.js): { cancelado } → nada (los diálogos nativos cancelados no
+// avisan); éxito → «PDF guardado: nombre»; { error } o excepción → «No se pudo
+// generar el PDF» con la vista previa ABIERTA. Los avisos van AL <p> DE ESTADO
+// de la barra, NO al toast: el toast es chrome y la hoja lo oculta con la
+// vista previa abierta (RF-1501), lo que haría invisible el aviso que exige el
+// RF-1506 — resolución de esa contradicción (opción (a): mensaje en línea,
+// dentro de la propia vista previa, que desaparece al cerrarla).
+function guardarComoPdfEscritorio() {
+  function avisar(mensaje, esError) {
+    estadoVp.textContent = mensaje;
+    estadoVp.classList.toggle("estado-vp-error", Boolean(esError));
+    estadoVp.hidden = false;
+  }
+
+  try {
+    Promise.resolve(window.gestorDatos.guardarPdf(nombreArchivoPdf(new Date())))
+      .then(function (resultado) {
+        if (!resultado || resultado.cancelado) return; // cancelar: sin aviso
+        if (resultado.guardado) {
+          // El nombre del fichero, no la ruta entera: breve y suficiente
+          const nombre = String(resultado.ruta || "").split(/[\\/]/).pop() ||
+            nombreArchivoPdf(new Date());
+          avisar("PDF guardado: " + nombre, false);
+        } else if (resultado.error) {
+          avisar("No se pudo generar el PDF", true);
+        }
+      })
+      .catch(function () {
+        avisar("No se pudo generar el PDF", true);
+      });
+  } catch (error) {
+    avisar("No se pudo generar el PDF", true);
+  }
+}
+
+// «Cerrar» de la barra (RF-1504): mismo camino que Escape
+botonVpCerrar.addEventListener("click", cerrarVistaPrevia);
 
 // =====================================================
 // Lista de clientes

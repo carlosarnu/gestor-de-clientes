@@ -1,0 +1,108 @@
+/* ===== Hoja de impresión: juego ÚNICO de reglas visuales (spec 017, RF-1510/RF-1511) =====
+
+   MECANISMO: este fichero se enlaza en index.html con media="print" DESPUÉS de
+   styles.css, así que el PAPEL es su estado por defecto — sin depender de ningún
+   evento: Ctrl+P y el menú del navegador imprimen la hoja aunque la vista previa
+   nunca se haya abierto (RF-1509, spec 013 intacta). La vista previa (T-04,
+   app.js) conmuta el atributo media del <link id="estilo-hoja"> a "all" mientras
+   dura, y lo devuelve a "print" al cerrar: las MISMAS reglas pintan pantalla-con-
+   vista-previa y papel, por eso no pueden divergir (RF-1510). Al ir en un <link>
+   posterior a styles.css ganan por orden de cascada a igual especificidad
+   (.cabecera-impresion sobre su display:none base, .lista-clientes sobre los
+   min-width de 2/3 columnas).
+
+   CADA REGLA VISUAL DE LA HOJA ESTÁ ESCRITA UNA SOLA VEZ, aquí y sin envoltorio
+   @media (la condición de medio la da el atributo media del enlace; escribirla
+   una vez por medio sería la duplicación que RF-1510 prohíbe). Lo que sigue en
+   styles.css dentro de @media print son solo reglas MECÁNICAS del papel (thead
+   repetido, cortes de página, ocultado de la barra): no cambian la apariencia.
+
+   Las reglas de la spec 013 (cuerpo del antiguo @media print de styles.css)
+   se movieron aquí tal cual, en el mismo orden: chrome oculto, cabecera de
+   contexto visible, marcas de edición restauradas, celdas/badge con texto
+   completo y tarjetas a una columna. */
+
+/* Chrome de la aplicación: cabecera decorativa con cinta, formulario completo,
+   título «Clientes» de la lista, pestañas de filtro, buscador, conmutador,
+   contador «N clientes», botones («Imprimir», Exportar/Importar), confirmación
+   en línea de la importación, selector de campos (chips y su título «Campos
+   del listado»), acciones de tarjeta («Editar»/«Eliminar»), «¿Seguro? · Sí,
+   eliminar / No», TODA la columna «Acciones» del listado (el th y los td
+   comparten .acciones-celda), mapa (iframe y enlace «Ver en Google Maps») y
+   toast */
+.cabecera,
+.lista-cabecera h2,
+#panel-formulario,
+.filtros,
+.filtro-provincia-bloque,
+.buscador,
+.conmutador,
+.contador,
+#boton-imprimir,
+.copia-seguridad,
+.confirmacion-importacion,
+.selector-campos,
+.tarjeta-acciones,
+.confirmacion,
+.acciones-celda,
+.mapa-caja,
+.toast {
+  display: none;
+}
+
+/* Cabecera de contexto (spec 013): existe solo para la hoja y aquí se ve, con
+   tipografía de título un punto menor que el <h2> de la lista (que en papel NO
+   se imprime: arriba queda oculto y la sustituye esta cabecera) */
+.cabecera-impresion {
+  display: block;
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+/* La marca de edición es de pantalla (RF-1003): en la hoja el cliente sale con
+   sus datos y sin marcas. Se restauran los bordes/tinte de una tarjeta o fila
+   normal, conservando el canto de color del tipo */
+.tarjeta.editando {
+  border-top-color: var(--linea);
+  border-right-color: var(--linea);
+  border-bottom-color: var(--linea);
+  box-shadow: none;
+}
+
+.listado .fila.editando td {
+  border-top: none;
+  border-bottom: 1px solid var(--linea-suave);
+  background: none;
+}
+
+.listado .fila.editando td:last-child {
+  border-right: none;
+}
+
+/* ===== Hoja: tabla siempre, una columna y texto completo (spec 013, RF-1103) ===== */
+
+/* Sin «…» en la hoja: el valor de las celdas sale COMPLETO (Decisión 8 de la
+   013: el corte con «…» y el title son recursos de pantalla) */
+.listado th,
+.listado td {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+/* El badge del tipo sigue la misma regla de pantalla (Decisión 8): en la hoja
+   su texto sale completo y sin límite de ancho (lo decide el papel) */
+.etiqueta {
+  max-width: none;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+/* Tarjetas en UNA sola columna: se anulan las 2/3 columnas de los bloques
+   min-width (misma especificidad, pero este fichero va enlazado después de
+   styles.css y gana por orden) */
+.lista-clientes {
+  grid-template-columns: 1fr;
+}
