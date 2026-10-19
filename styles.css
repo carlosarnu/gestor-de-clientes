@@ -72,12 +72,6 @@ h2 {
   margin-bottom: 2px;
 }
 
-.cabecera p {
-  margin: 0;
-  color: var(--tinta-media);
-  font-size: 0.95rem;
-}
-
 /* ===== Paneles ===== */
 
 .panel {
@@ -130,8 +124,11 @@ h2 {
   width: 100%;
 }
 
+/* El mismo aspecto de foco para inputs, textareas Y el desplegable del tipo
+   (revisión global, B9): antes el <select> no recibía outline al enfocarlo */
 .campo input:focus,
-.campo textarea:focus {
+.campo textarea:focus,
+.campo select:focus {
   outline: 2px solid var(--tinta);
   outline-offset: 1px;
   border-color: var(--tinta);
@@ -853,7 +850,8 @@ h2 {
   border-bottom: none;
 }
 
-/* Las filas no son accionables todavía (acciones en T-05): sin aspecto clicable */
+/* La fila en sí no tiene aspecto clicable: desde la spec 012 las acciones
+   (Editar / Eliminar / «¿Seguro?») viven en su propia celda de acciones */
 .listado .fila {
   cursor: default;
 }

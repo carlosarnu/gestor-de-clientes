@@ -47,7 +47,8 @@ const {
   alternarTipoFijo,
   añadirTipoLibre,
   quitarTipoLibre,
-  unirTiposTexto
+  unirTiposTexto,
+  sanearListaClientes
 } = require("./logica.js");
 
 // Ayuda: un formulario falso con la interfaz de FormData (.get)
@@ -960,4 +961,146 @@ test("importarClientes migra «FOAM» dentro de tipos y conserva los literales d
   // los dos literales de error siguen intactos (regresión de la 011)
   assert.equal(importarClientes("basura {{{").error, "El archivo no tiene un formato JSON válido");
   assert.equal(importarClientes('{"empresa":"Textiles Norte"}').error, "El archivo no contiene una lista de clientes");
+});
+
+// =====================================================
+// Revisión global de código (2026-10-19): datos corruptos,
+// ids únicos al importar y orden con fecha no numérica
+// =====================================================
+
+// --- migrarTipos nunca lanza (M1) ---
+
+test("migrarTipos con [null] o [undefined] no lanza y deja la entrada tal cual (M1)", () => {
+  const conNulo = [null];
+  assert.equal(migrarTipos(conNulo), conNulo); // sin cambios: ni lista nueva ni escritura
+  const conIndefinido = [undefined];
+  assert.equal(migrarTipos(conIndefinido), conIndefinido);
+  assert.deepEqual(conNulo, [null]);
+  assert.deepEqual(conIndefinido, [undefined]);
+});
+
+test("migrarTipos no convierte un texto en un cliente falso (M1)", () => {
+  const lista = ["hola"];
+  assert.deepEqual(migrarTipos(lista), ["hola"]); // sigue siendo el texto, no un objeto
+});
+
+test("migrarTipos con basura intercalada migra solo a los clientes de verdad (M1)", () => {
+  const lista = [
+    null,
+    "hola",
+    { id: 1, fecha: 1, empresa: "", cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipo: "FOAM", notas: "se conserva" },
+    42,
+    ["array"]
+  ];
+  const migrada = migrarTipos(lista);
+  assert.equal(migrada.length, 5); // nadie se pierde ni se inventa
+  assert.equal(migrada[0], null);
+  assert.equal(migrada[1], "hola");
+  assert.equal(migrada[3], 42);
+  assert.deepEqual(migrada[4], ["array"]);
+  assert.deepEqual(migrada[2].tipos, ["Espuma"]); // el cliente SÍ se migra
+  assert.equal(migrada[2].tipo, "Espuma");
+  assert.equal(migrada[2].notas, "se conserva");
+});
+
+// --- sanearListaClientes: helper de saneado en memoria (M1b) ---
+
+test("sanearListaClientes conserva solo objetos planos y devuelve una lista NUEVA (M1)", () => {
+  const primero = { id: 1, fecha: 1, empresa: "Asientos Vega" };
+  const segundo = { id: 2, fecha: 2, empresa: "Textiles Norte" };
+  const lista = [null, primero, "hola", 42, undefined, ["array"], true, segundo];
+  const saneada = sanearListaClientes(lista);
+  assert.deepEqual(saneada, [primero, segundo]);
+  assert.notEqual(saneada, lista); // lista NUEVA, no la misma referencia
+  assert.equal(lista.length, 8);   // la entrada no se muta
+  assert.equal(saneada[0], primero); // los clientes válidos se conservan tal cual
+});
+
+test("sanearListaClientes con algo que no es una lista devuelve una lista vacía (M1)", () => {
+  assert.deepEqual(sanearListaClientes("basura"), []);
+  assert.deepEqual(sanearListaClientes(null), []);
+  assert.deepEqual(sanearListaClientes(undefined), []);
+  assert.deepEqual(sanearListaClientes({ id: 1 }), []); // un objeto suelto no es una lista
+  assert.deepEqual(sanearListaClientes([]), []);
+});
+
+test("sanearListaClientes + migrarTipos dejan usable una lista corrupta de arranque (M1/B6)", () => {
+  // Caso de la revisión: localStorage con basura intercalada → el cliente válido
+  // queda en memoria y su id sigue siendo el mismo (los botones siguen funcionando)
+  const valido = { id: 1, fecha: 1700000000000, empresa: "Único", cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipo: "FOAM", notas: "" };
+  const resultado = sanearListaClientes(migrarTipos(["hola", valido, null]));
+  assert.equal(resultado.length, 1);
+  assert.equal(resultado[0].id, 1);
+  assert.equal(resultado[0].empresa, "Único");
+  assert.deepEqual(resultado[0].tipos, ["Espuma"]);
+  assert.equal(resultado[0].tipo, "Espuma");
+});
+
+// --- importarClientes con ids únicos (B5) ---
+
+test("importarClientes separa los ids duplicados del fichero (B5)", () => {
+  function cliente(empresa) {
+    return { id: 7, fecha: 1700000000000, empresa: empresa, cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipos: [], tipo: "", notas: "" };
+  }
+  const resultado = importarClientes(JSON.stringify([
+    cliente("Primera"), cliente("Segunda"), cliente("Tercera")
+  ]));
+  assert.equal(resultado.error, null);
+  const ids = resultado.clientes.map(c => c.id);
+  assert.equal(new Set(ids).size, 3); // los tres ids, distintos
+  assert.equal(ids[0], 7);            // el primero conserva el suyo
+  assert.equal(typeof ids[1], "number");
+  assert.equal(typeof ids[2], "number");
+  // y las empresas quedan en el mismo orden (nadie se pierde)
+  assert.deepEqual(resultado.clientes.map(c => c.empresa), ["Primera", "Segunda", "Tercera"]);
+});
+
+test("importarClientes: un id generado nunca ocupa el sitio de uno preservado (B5)", () => {
+  // El id generado es Date.now() + índice: congelamos el reloj para que ese
+  // número sea EXACTAMENTE el que el fichero trae en otra posición
+  const RELOJ = 1760000000000;
+  const relojOriginal = Date.now;
+  Date.now = function () { return RELOJ; };
+  let resultado;
+  try {
+    resultado = importarClientes(JSON.stringify([
+      { id: "no numérico", fecha: 1, empresa: "Sin id", cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipos: [], tipo: "", notas: "" },
+      { id: RELOJ, fecha: 2, empresa: "Trae el id generado", cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipos: [], tipo: "", notas: "" }
+    ]));
+  } finally {
+    Date.now = relojOriginal;
+  }
+  assert.equal(resultado.error, null);
+  const ids = resultado.clientes.map(c => c.id);
+  assert.equal(ids[1], RELOJ);        // el preservado conserva SU id
+  assert.notEqual(ids[0], RELOJ);     // el generado no le roba el sitio
+  assert.notEqual(ids[0], ids[1]);    // y al final, ids únicos
+});
+
+test("importarClientes con ids que faltan no repite ninguno (B5)", () => {
+  const sinId = { fecha: 1700000000000, empresa: "Sin id", cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipos: [], tipo: "", notas: "" };
+  const resultado = importarClientes(JSON.stringify([sinId, sinId, sinId]));
+  assert.equal(resultado.error, null);
+  const ids = resultado.clientes.map(c => c.id);
+  assert.equal(new Set(ids).size, 3);
+  ids.forEach(id => assert.ok(Number.isFinite(id)));
+});
+
+// --- ordenarClientes con fecha no numérica (B10) ---
+
+test("ordenarClientes con fechas no numéricas no falla y las trata como 0 (B10)", () => {
+  const lista = [
+    { id: 1, fecha: "x", empresa: "Fecha de mentira" },
+    { id: 2, fecha: 300, empresa: "Reciente" },
+    { id: 3, empresa: "Sin campo fecha" },
+    { id: 4, fecha: 100, empresa: "Antigua" },
+    { id: 5, fecha: null, empresa: "Fecha nula" },
+    { id: 6, fecha: Infinity, empresa: "Fecha infinita" }
+  ];
+  const ordenada = ordenarClientes(lista);
+  const ids = ordenada.map(c => c.id);
+  assert.deepEqual(ids.slice(0, 2), [2, 4]);          // las numéricas, de mayor a menor
+  assert.deepEqual(new Set(ids.slice(2)), new Set([1, 3, 5, 6])); // las demás, al final
+  assert.equal(ordenada.length, 6);                   // nadie se pierde
+  assert.deepEqual(lista.map(c => c.id), [1, 2, 3, 4, 5, 6]); // la entrada no se muta
 });

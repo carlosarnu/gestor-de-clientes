@@ -23,13 +23,30 @@ function selloFechaLocal(fecha) {
   return `${anio}-${mes}-${dia}`;
 }
 
+// Ruta libre para guardar un clientes.json dañado (revisión global, M3): patrón
+// «clientes-daños-AAAA-MM-DD.json» y, si ese destino YA EXISTE, contador «-2»,
+// «-3»… — fs.renameSync en Windows SOBRESCRIBE el destino, así que un segundo
+// daño el mismo día destruiría la primera copia dañada. El fichero dañado
+// NUNCA se borra: solo se mueve a un nombre que nadie ocupa.
+function rutaCopiaDania(directorio, sello) {
+  const base = `clientes-daños-${sello}`;
+  let nombre = `${base}.json`;
+  let contador = 2;
+  while (fs.existsSync(path.join(directorio, nombre))) {
+    nombre = `${base}-${contador}.json`;
+    contador += 1;
+  }
+  return path.join(directorio, nombre);
+}
+
 // =====================================================
 // IPC síncrono: lectura del archivo (contrato de app.js, RF-902/RF-903)
 // =====================================================
 // - No existe          → { archivoExiste: false, clientes: null }
 // - Es un array        → { archivoExiste: true,  clientes: <array> }
 // - Dañado / no array  → se RENOMBRA (nunca se borra) a
-//                        clientes-daños-AAAA-MM-DD.json y se devuelve
+//                        clientes-daños-AAAA-MM-DD.json — o con sufijo «-2»,
+//                        «-3»… si ese nombre ya está ocupado — y se devuelve
 //                        { archivoExiste: true, clientes: null }
 ipcMain.on("gestor-datos:leer", (event) => {
   const ruta = rutaArchivoClientes();
@@ -55,12 +72,10 @@ ipcMain.on("gestor-datos:leer", (event) => {
 
   if (clientes === null) {
     // Archivo dañado o que no es una lista: renombrarlo para conservarlo
-    // (los datos son sagrados, RF-903) y arrancar vacíos
+    // (los datos son sagrados, RF-903) y arrancar vacíos. El destino NUNCA
+    // existirá: un segundo daño el mismo día no pisa la copia anterior (M3)
     try {
-      const destino = path.join(
-        path.dirname(ruta),
-        `clientes-daños-${selloFechaLocal(new Date())}.json`
-      );
+      const destino = rutaCopiaDania(path.dirname(ruta), selloFechaLocal(new Date()));
       fs.renameSync(ruta, destino);
     } catch (error) {
       // Si el renombrado fallara, se intenta seguir igual: la app arranca vacía

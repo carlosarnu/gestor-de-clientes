@@ -214,6 +214,24 @@ function tiposIguales(guardados, efectivos) {
     guardados.every(function (tipo, i) { return tipo === efectivos[i]; });
 }
 
+// ¿Es un cliente posible (objeto plano)? Distingue la basura que puede traer un
+// fichero o la clave de datos (null, undefined, textos, números, arrays) de un
+// objeto de verdad. Único criterio de sanearListaClientes y de migrarTipos.
+function esClienteObjeto(valor) {
+  return valor !== null && typeof valor === "object" && !Array.isArray(valor);
+}
+
+// Lista NUEVA conservando SOLO las entradas que son objetos planos (M1b): es el
+// saneo EN MEMORIA de las rutas de carga (web y escritorio) y de la importación.
+// Nunca muta la entrada, nunca lanza y, muy importante, NUNCA se escribe en el
+// fichero ni en localStorage: filtrar es cosa del arranque, la basura guardada
+// solo desaparece si el usuario guarda una acción después (los datos son sagrados).
+// Si no viene una lista (JSON que no era un array) → lista vacía, sin errores.
+function sanearListaClientes(lista) {
+  if (!Array.isArray(lista)) return [];
+  return lista.filter(esClienteObjeto);
+}
+
 // Migración de datos antiguos al esquema con `tipos` múltiples (RF-1202): por cada
 // cliente escribe `tipos` = tiposCliente(cliente) y `tipo` = `tipos[0] ?? ""`,
 // conservando intactos el resto de campos (los datos son sagrados, regla 3 de la
@@ -223,9 +241,14 @@ function tiposIguales(guardados, efectivos) {
 // vacío (Decisión 12). Devuelve la MISMA lista si no hay nada que migrar, así que
 // la escritura (localStorage / clientes.json) solo ocurre si algo cambió.
 // Es idempotente: aplicarla dos veces deja exactamente el mismo resultado.
+// NUNCA lanza (revisión global, M1): las entradas que no son objetos (basura de
+// datos corruptos, p. ej. [null]) se dejan TAL CUAL sin migrar, en la misma
+// posición y sin inventar clientes — así un arranque sucio no mata la app.
 function migrarTipos(lista) {
+  if (!Array.isArray(lista)) return []; // sin lista no hay nada que migrar (nunca lanza)
   let huboCambio = false;
   const migrada = lista.map(function (cliente) {
+    if (!esClienteObjeto(cliente)) return cliente; // basura intacta, sin migrar
     const tipos = tiposCliente(cliente);
     const tipo = tipos.length > 0 ? tipos[0] : "";
     // Solo se reescribe el cliente si `tipos` o `tipo` difieren del resultado
@@ -292,10 +315,18 @@ function filtrarClientes(lista, filtro) {
   });
 }
 
-// Del más reciente al más antiguo por fecha de creación
+// Del más reciente al más antiguo por fecha de creación.
+// Comparación SEGURA (revisión global, B10): una fecha no numérica (texto, null,
+// campo ausente, Infinity…) se trata como 0 — es decir, como lo más antiguo— en
+// vez de dar NaN y dejar el orden en manos del motor; el criterio de «número de
+// verdad» es el mismo esNumero que usan fechaTextoLocal e importarClientes.
+function fechaOrden(cliente) {
+  return cliente && esNumero(cliente.fecha) ? cliente.fecha : 0;
+}
+
 function ordenarClientes(lista) {
   return lista.slice().sort(function (a, b) {
-    return b.fecha - a.fecha;
+    return fechaOrden(b) - fechaOrden(a);
   });
 }
 
@@ -450,13 +481,35 @@ function importarClientes(textoJson) {
     return { clientes: null, error: "El archivo no contiene una lista de clientes" };
   }
 
+  // Mismo saneo que las rutas de carga (M1b): solo los objetos planos son
+  // clientes posibles; el resto (nulos, textos, números, arrays) se ignora sin
+  // romper la importación
+  const elementos = sanearListaClientes(datos);
+
+  // Ids ÚNICOS en el resultado (B5): los ids del fichero pueden venir repetidos
+  // entre sí, y los que hay que generar (Date.now() + índice) pueden chocar con
+  // uno que el fichero traiga más adelante — con ids duplicados, Editar o
+  // Eliminar afectarían a TODOS los clientes que lo compartan. Para que un id
+  // generado nunca le robe el sitio a uno preservado, se apunta TODOS los ids
+  // preservados antes de repartir (reservados) y los ya repartidos (repartidos).
+  const reservados = new Set();
+  elementos.forEach(function (elemento) {
+    if (esNumero(elemento.id)) reservados.add(elemento.id);
+  });
+  const repartidos = new Set();
+
   const clientes = [];
-  datos.forEach(function (elemento, indice) {
-    // Solo los objetos son clientes posibles; el resto (nulos, textos, números,
-    // arrays) se ignora sin romper la importación
-    if (elemento === null || typeof elemento !== "object" || Array.isArray(elemento)) return;
+  elementos.forEach(function (elemento, indice) {
+    let id = esNumero(elemento.id) ? elemento.id : null;
+    if (id === null || repartidos.has(id)) {
+      // Sin id válido o id ya usado: id nuevo, nunca un número reservado
+      id = Date.now() + indice;
+      while (repartidos.has(id) || reservados.has(id)) id += 1;
+    }
+    repartidos.add(id);
+
     clientes.push({
-      id: esNumero(elemento.id) ? elemento.id : Date.now() + indice,
+      id: id,
       fecha: esNumero(elemento.fecha) ? elemento.fecha : Date.now(),
       empresa: texto(elemento.empresa),
       cif: texto(elemento.cif),
@@ -637,6 +690,7 @@ if (typeof module !== "undefined" && module.exports) {
     buscarClientes,
     esTipoFijo,
     migrarTipos,
+    sanearListaClientes,
     nombreArchivoExportacion,
     nombreArchivoPdf,
     importarClientes,

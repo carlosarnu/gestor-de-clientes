@@ -104,7 +104,9 @@ function cargarClientes() {
 
     // Migración spec 009 («FOAM» → «Espuma») también al leer el archivo (RF-902).
     // Si hubo cambio, lo escribimos en el archivo; un fallo de escritura NUNCA
-    // vacía la lista (mismo criterio RF-802 que en la web).
+    // vacía la lista (mismo criterio RF-802 que en la web). SOLO la migración
+    // motiva esta escritura: la basura que traiga el archivo (entradas que no
+    // son objetos) se conserva en el fichero tal cual (los datos son sagrados).
     const migrada = migrarTipos(lista);
     if (migrada !== lista) {
       try {
@@ -113,7 +115,9 @@ function cargarClientes() {
         // La lista en memoria sigue siendo la correcta
       }
     }
-    return migrada;
+    // Saneo EN MEMORIA (M1b, revisión global): entradas que no son objetos
+    // (null, textos, arrays…) fuera de la lista de trabajo, sin reescribir nada
+    return sanearListaClientes(migrada);
   }
 
   // ===== Web: comportamiento original intacto (RF-802) =====
@@ -128,8 +132,9 @@ function cargarClientes() {
   }
 
   // Migración spec 009: el tipo antiguo «FOAM» pasa a «Espuma» (solo si hay cambio)
-  const migrada = migrarTipos(Array.isArray(lista) ? lista : []);
-  if (migrada !== lista) {
+  const fuente = Array.isArray(lista) ? lista : [];
+  const migrada = migrarTipos(fuente);
+  if (migrada !== fuente) {
     // 2) Escritura de la migración en su propio try: si falla (p. ej. cuota llena)
     // seguimos con los datos leídos en memoria; un fallo de escritura NUNCA vacía la lista (RF-802)
     try {
@@ -138,7 +143,9 @@ function cargarClientes() {
       // No se escribe nada; la lista en memoria sigue siendo la correcta
     }
   }
-  return migrada;
+  // Saneo EN MEMORIA (M1b, revisión global): la clave NO se reescribe por esto —
+  // la basura solo desaparece si el usuario guarda una acción después
+  return sanearListaClientes(migrada);
 }
 
 function guardarClientes() {
@@ -191,11 +198,13 @@ function tiposDesdeFormulario() {
   if (elegido === "") return [];                 // «Sin tipo»
   if (elegido !== "Otros") return [elegido];     // tipo fijo
   // «Otros»: el texto del campo condicional; vacío → «Otros»
-  const texto = campoTipoOtro.value.trim();
-  if (texto === "") return ["Otros"];
+  // (nombre «textoOtro», no «texto»: una constante local llamada `texto`
+  // sombrearía la función global texto() de logica.js, revisión global B7)
+  const textoOtro = campoTipoOtro.value.trim();
+  if (textoOtro === "") return ["Otros"];
   // Si el texto coincide con un tipo fijo escrito a mano, se guarda como fijo
   // (mismo criterio que la lógica añadirTipoLibre, RF-1403)
-  return [texto];
+  return [textoOtro];
 }
 
 // Reset del formulario: desplegable en «Sin tipo», campo oculto y vacío
@@ -225,7 +234,18 @@ formulario.addEventListener("submit", function (evento) {
   // Alta con el tipo elegido en el desplegable (spec 016, RF-1403): la lógica
   // normaliza y escribe `tipos` + `tipo` = tipos[0] ?? ""
   clientes.push(construirCliente(datos, Date.now(), Date.now(), tiposDesdeFormulario()));
-  guardarClientes();
+
+  // Guardado protegido (revisión global, M2): si la escritura falla (cuota llena
+  // en la web, error de disco en escritorio) SE REVIERTE el push — el cliente no
+  // queda en memoria y, al reintentar «Guardar cliente», no se crea un duplicado—
+  // y se avisa en el toast; el formulario se conserva RELLENO para poder repetir
+  try {
+    guardarClientes();
+  } catch (error) {
+    clientes.pop(); // deshacer el push: memoria igual que antes del alta
+    pintarAviso("No se pudo guardar los datos");
+    return;
+  }
 
   // Alta con feedback (spec 010, RF-801): buscador limpio y aviso «Cliente guardado».
   // La limpieza va antes de pintarFiltros/pintarLista para que la lista se pinte sin filtro de texto
@@ -455,7 +475,16 @@ function guardarEdicion(datos) {
   // Actualizamos los campos conservando id y fecha originales (ver logica.js);
   // el tipo viene del desplegable del formulario (tiposDesdeFormulario, RF-1403)
   clientes = aplicarEdicion(clientes, clienteEditandoId, datos, tiposDesdeFormulario());
-  guardarClientes();
+
+  // Guardado protegido (revisión global, M2): si la escritura falla, la edición
+  // se queda en memoria (no se duplica ni se pierde nada, y una acción posterior
+  // que sí se pueda guardar la persistirá entera) pero el usuario DEBE enterarse
+  let guardado = true;
+  try {
+    guardarClientes();
+  } catch (error) {
+    guardado = false;
+  }
 
   clienteEditandoId = null;
   resetearFormulario();
@@ -463,7 +492,7 @@ function guardarEdicion(datos) {
   // La edición puede cambiar o quitar la provincia del filtro activo (RF-1305)
   pintarFiltroProvincia();
   pintarLista();
-  pintarAviso(mensajeAviso("actualizado"));
+  pintarAviso(guardado ? mensajeAviso("actualizado") : "No se pudo guardar los datos");
 }
 
 botonCancelar.addEventListener("click", cancelarEdicion);
@@ -483,12 +512,20 @@ function eliminarCliente(id) {
   }
 
   confirmandoEliminarId = null;
-  guardarClientes();
+  // Guardado protegido (revisión global, M2): el borrado se queda en memoria y
+  // el usuario se entera si la escritura falla (la lista repintada ya no lo
+  // muestra, pero una acción posterior que se pueda guardar lo consolidará)
+  let guardado = true;
+  try {
+    guardarClientes();
+  } catch (error) {
+    guardado = false;
+  }
   // Si se borró el último cliente de la provincia filtrada, se repuebla y el
   // filtro vuelve solo a «Todas las provincias» (RF-1305, caso límite)
   pintarFiltroProvincia();
   pintarLista();
-  pintarAviso(mensajeAviso("eliminado"));
+  pintarAviso(guardado ? mensajeAviso("eliminado") : "No se pudo guardar los datos");
 }
 
 // Clics dentro de la lista (Editar / Eliminar / Sí / No)
@@ -612,7 +649,17 @@ botonReemplazar.addEventListener("click", function () {
 
   clientes = importacionPendiente;
   importacionPendiente = null;
-  guardarClientes();
+
+  // Guardado protegido (revisión global, M2): si la escritura falla, la lista
+  // importada se queda en memoria (es inocua: no duplica ni pierde nada y una
+  // acción posterior que sí se pueda guardar la persistirá entera) pero el
+  // usuario DEBE enterarse; el resto del estado limpio se aplica igual
+  let guardado = true;
+  try {
+    guardarClientes();
+  } catch (error) {
+    guardado = false;
+  }
 
   // Estado limpio (RF-901): pestaña «Todos» y buscador vacío, campo e interno
   filtroActivo = "Todos";
@@ -633,7 +680,7 @@ botonReemplazar.addEventListener("click", function () {
   pintarFiltroProvincia();
   ocultarConfirmacionImportacion();
   pintarLista();
-  pintarAviso("Clientes importados");
+  pintarAviso(guardado ? "Clientes importados" : "No se pudo guardar los datos");
 });
 
 // «Cancelar»: se descarta el fichero y no cambia nada
@@ -857,7 +904,7 @@ function crearTarjeta(cliente) {
   // largo con «…» y el title lo muestra completo (como .chip-texto y las celdas)
   const tipos = tiposCliente(cliente);
   const etiquetas = (tipos.length > 0 ? tipos : [""]).map(function (tipo) {
-    return '<span class="etiqueta etiqueta-' + claseTipo(tipo) + '"' +
+    return '<span class="etiqueta' + claseTipoElemento("etiqueta", tipo) + '"' +
       (tipo ? ' title="' + escaparAtributo(tipo) + '"' : "") + ">" +
       escapar(nombreTipo(tipo)) +
       "</span>";
@@ -877,7 +924,7 @@ function crearTarjeta(cliente) {
   return (
     // El canto de la tarjeta es el del PRIMER tipo (Decisión 6 de la spec 014: el
     // mismo que `tipo` ven los lectores antiguos); sin tipos, sin canto, como hoy
-    '<article class="tarjeta tarjeta-' + claseTipo(tipos[0]) + (editando ? " editando" : "") + '">' +
+    '<article class="tarjeta' + claseTipoElemento("tarjeta", tipos[0]) + (editando ? " editando" : "") + '">' +
       '<div class="tarjeta-cabecera">' +
         '<h3 class="tarjeta-empresa">' + (escapar(cliente.empresa) || "Sin nombre") + "</h3>" +
         '<div class="etiquetas">' + etiquetas + "</div>" +
@@ -975,7 +1022,7 @@ function crearTablaListado(visibles) {
     // La marca de edición cubre la fila entera (RF-1003), como en la tarjeta
     const editando = filaDatos.id === clienteEditandoId;
     // Canto por el PRIMER tipo efectivo, igual que la tarjeta (Decisión 6, RF-1207)
-    return '<tr class="fila fila-' + claseTipo(tiposCliente(visibles[indice])[0]) +
+    return '<tr class="fila' + claseTipoElemento("fila", tiposCliente(visibles[indice])[0]) +
       (editando ? " editando" : "") + '" data-id="' + filaDatos.id + '">' +
       celdas + accionesFila(filaDatos.id) + "</tr>";
   }).join("");
@@ -1015,6 +1062,15 @@ function escapar(valor) {
   const div = document.createElement("div");
   div.textContent = valor || "";
   return div.innerHTML;
+}
+
+// Clase extra con el color del tipo de un elemento (« tarjeta-tela»,
+// « fila-otros», « etiqueta-espuma») o cadena vacía si no hay tipo: claseTipo("")
+// devuelve «» y concatenar a ciegas dejaba clases con guion final («tarjeta-»,
+// «fila-», «etiqueta-») que no pinta nada (revisión global, B11)
+function claseTipoElemento(prefijo, tipo) {
+  const clase = claseTipo(tipo);
+  return clase === "" ? "" : " " + prefijo + "-" + clase;
 }
 
 // =====================================================
