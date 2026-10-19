@@ -101,7 +101,7 @@ Total: **122 → 123 tests**. Los 122 existentes siguen **intactos**.
 | `app.js` | Estado `vistaPreviaAbierta` + `scrollAntesVistaPrevia`; refs `estiloHoja`, `barraVistaPrevia` y los 3 botones; `refrescarCabeceraImpresion()` (extrae la expresión del listener `beforeprint`, que la reutiliza); `abrirVistaPrevia()`/`cerrarVistaPrevia()` (pseudocódigo §1); el botón «Imprimir» de la lista pasa de `window.print()` a `abrirVistaPrevia()` **tras la misma guardia**; listener único `keydown` (solo `Escape` y solo con la vista previa abierta; ninguna otra tecla ni atajo se intercepta); «Imprimir» barra → `window.print()`; «Guardar como PDF» → `EN_ESCRITORIO` ? IPC `guardarPdf` (`{cancelado}` → nada, `{error}` o excepción → toast «No se pudo generar el PDF», vista previa **abierta**) : `window.print()`; «Cerrar» → `cerrarVistaPrevia()` | RF-1501, RF-1502, RF-1504, RF-1505, RF-1506, RF-1507 |
 | `logica.js` | `nombreArchivoPdf` + `module.exports` (§2). **Nada más se toca** | RF-1512 |
 | `test-logica.js` | Test de `nombreArchivoPdf` (§2) + su import | RF-1512 |
-| `escritorio/main.js` | **IPC asíncrono** `ipcMain.handle("gestor-datos:guardar-pdf", async (event, nombreArchivo) => …)` (los síncronos de la 011 no sirven: `printToPDF` y `showSaveDialog` son promesas): `fs.mkdirSync` de la carpeta de datos (si falla, se usa `app.getPath("documents")`); `dialog.showSaveDialog(ventana, { defaultPath: path.join(carpeta, path.basename(nombreArchivo)), filters: [{ name: "PDF", extensions: ["pdf"] }] })` → cancelado ⇒ `{ cancelado: true }`; `ventana.webContents.printToPDF({ pageSize: "A4", printBackground: false })` (A4 como el papel del navegador; fondos **sin forzar**, coherente con la 013); `fs.writeFileSync`; devuelve `{ guardado: true, ruta }` o `{ error }`. **`clientes.json` no se toca** | RF-1506 |
+| `escritorio/main.js` | **IPC asíncrono** `ipcMain.handle("gestor-datos:guardar-pdf", async (event, nombreArchivo) => …)` (los síncronos de la 011 no sirven: `printToPDF` y `showSaveDialog` son promesas): `fs.mkdirSync` de la carpeta de datos (si falla, se usa `app.getPath("documents")`); `dialog.showSaveDialog(ventana, { defaultPath: path.join(carpeta, path.basename(nombreArchivo)), filters: [{ name: "PDF", extensions: ["pdf"] }] })` → cancelado ⇒ `{ cancelado: true }`; `ventana.webContents.printToPDF({ pageSize: "A4", printBackground: true })` (A4 como el papel del navegador; **con fondos**: decisión T-05, la generación silenciosa no tiene casilla de «gráficos de fondo»); `fs.writeFileSync`; devuelve `{ guardado: true, ruta }` o `{ error }`. **`clientes.json` no se toca** | RF-1506 |
 | `escritorio/preload.js` | `guardarPdf(nombreArchivo) { return ipcRenderer.invoke("gestor-datos:guardar-pdf", nombreArchivo); }` (async; el resto del puente intacto) | RF-1506 |
 | `AGENTS.md`, `MEMORY.md` | Cierre: nueva funcionalidad, `hoja-impresion.css` en la estructura, dos puntos derogados de la 013, nota de instalador | RF-1512 |
 
@@ -199,11 +199,13 @@ mecánica de `@media print`.
    `beforeprint` (Electron **no** garantiza ese evento con `printToPDF`: el PDF de
    escritorio debe salir correcto aunque no se dispare) y recalcular en dos sitios
    distintos (divergencia).
-7. **`printToPDF({ pageSize: "A4", printBackground: false })` sin forzar márgenes.**
-   A4 como el papel por defecto en España; fondos sin forzar = misma política que
-   la 013 («no se fuerza `color-adjust`»); márgenes = los del usuario/sistema
-   (fuera de alcance: «Configuración de página»). *Descartado:* forzar `printBackground: true`
-   (cambia la política de fondos ya decidida en la 013) y márgenes propios.
+ 7. **`printToPDF({ pageSize: "A4", printBackground: true })` sin forzar márgenes.**
+    A4 como el papel por defecto en España; **fondos: sí** (*enmienda de la decisión
+    T-05, documentada en acta*): la generación silenciosa no tiene la casilla
+    «gráficos de fondo» del diálogo y la revisión visual del PDF confirma que los
+    cantos de color por tipo sí se necesitan; márgenes = los del
+    usuario/sistema (fuera de alcance: «Configuración de página»). *Descartado:*
+    márgenes propios.
 8. **Un único listener `keydown` permanente que solo reacciona a `Escape` con la
    vista previa abierta.** El cuadro nativo consume su propio Escape (nunca llega
    a la página); no se intercepta ninguna otra tecla ni Ctrl+P (Decisión 4 de la

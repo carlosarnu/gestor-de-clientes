@@ -160,8 +160,8 @@ ver alterados ni un solo cliente (`localStorage` y `clientes.json` intactos).
   **diálogo nativo de guardado** con nombre por defecto **`listado-AAAA-MM-DD.pdf`** con fecha
   **local** (mismo criterio de fecha local que la exportación de la 011). CUANDO el usuario
   **cancele** el diálogo, EL SISTEMA SHALL **no guardar nada y sin mostrar aviso** de error.
-  SI la generación del PDF fallase, ENTONCES EL SISTEMA SHALL mostrar el toast **«No se pudo
-  generar el PDF»** y la vista previa SHALL **permanecer abierta**. El PDF no SHALL tocar
+  SI la generación del PDF fallase, ENTONCES EL SISTEMA SHALL mostrar el aviso **«No se pudo
+  generar el PDF»** y la vista previa SHALL **permanecer abierta**. *(Enmienda 2026-10-19 tras implementar: el aviso va en el `<p id="estado-vp">` de la barra de vista previa, no en el toast; el toast es chrome oculto por la hoja con la previa abierta (RF-1501), contradicción resuelta en la decisión de implementación T-05.)* El PDF no SHALL tocar
   `clientes.json`. **Evidencia** (el MCP no puede abrir `showSaveDialog` ni inspeccionar el PDF): **checklist manual** con `npm start`/exe — generar el PDF, **abrirlo y revisarlo** (solo hoja: cabecera de contexto + listado, sin barra ni chrome), **cancelar** el diálogo y constatar que no se escribe ningún fichero y la vista previa sigue, y comparar `clientes.json` **por hash antes/después** (idéntico).
 - **RF-1507 — «Guardar como PDF» en la web.** CUANDO se pulse **«Guardar como PDF»** en la web,
   EL SISTEMA SHALL abrir el **diálogo de impresión del navegador** —la única vía con que la web
@@ -285,7 +285,7 @@ ver alterados ni un solo cliente (`localStorage` y `clientes.json` intactos).
   vivo —RF-1501—, con la cabecera refrescada en `beforeprint`); al cancelar el cuadro, la vista
   previa **permanece abierta** y la app no se rompe.
 - **Cancelar el guardado del PDF**: no se escribe nada y **sin** aviso (convención de los
-  diálogos nativos); **fallo real** de generación → toast «No se pudo generar el PDF» y vista
+  diálogos nativos); **fallo real** de generación → aviso «No se pudo generar el PDF» y vista
   previa abierta.
 - **Ctrl+P tras cambiar filtro/búsqueda/provincia sin tocar el botón**: la cabecera se rellena
   fresca en `beforeprint` (RF-1509, comportamiento ya verificado en la 013).
