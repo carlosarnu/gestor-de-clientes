@@ -47,6 +47,7 @@ const {
   alternarTipoFijo,
   añadirTipoLibre,
   quitarTipoLibre,
+  tiposDesdeCasillas,
   unirTiposTexto,
   sanearListaClientes
 } = require("./logica.js");
@@ -846,6 +847,62 @@ test("añadirTipoLibre no duplica libres, no trunca y el vacío no añade nada (
 test("quitarTipoLibre quita solo ese texto exacto y sin efecto si no estaba (RF-1203)", () => {
   assert.deepEqual(quitarTipoLibre(["Tela", "Toldos", "Cortinas"], "Toldos"), ["Tela", "Cortinas"]);
   assert.deepEqual(quitarTipoLibre(["Tela"], "Toldos"), ["Tela"]);
+});
+
+// --- casillas del formulario: mapeo al guardar (spec 016 → selección múltiple) ---
+
+test("tiposDesdeCasillas sin nada marcado y sin texto devuelve [] → «Sin tipo»", () => {
+  assert.deepEqual(tiposDesdeCasillas([], ""), []);
+  assert.deepEqual(tiposDesdeCasillas([], "   "), []);
+  assert.deepEqual(tiposDesdeCasillas([], " , "), []); // fragmentos vacíos no cuentan
+});
+
+test("tiposDesdeCasillas con fijos marcados los devuelve SIEMPRE en orden canónico", () => {
+  assert.deepEqual(tiposDesdeCasillas(["Tela"], ""), ["Tela"]);
+  assert.deepEqual(tiposDesdeCasillas(["Tela", "Espuma"], ""), ["Tela", "Espuma"]);
+  // marcadas al revés en el formulario: el resultado va en orden Tela/Espuma/Estructuras
+  assert.deepEqual(tiposDesdeCasillas(["Estructuras", "Tela", "Espuma"], ""), ["Tela", "Espuma", "Estructuras"]);
+});
+
+test("tiposDesdeCasillas con «Otros» marcado y sin texto añade el literal «Otros»", () => {
+  assert.deepEqual(tiposDesdeCasillas(["Otros"], ""), ["Otros"]);
+  assert.deepEqual(tiposDesdeCasillas(["Otros"], "  ,  "), ["Otros"]);
+  assert.deepEqual(tiposDesdeCasillas(["Tela", "Otros"], ""), ["Tela", "Otros"]);
+});
+
+test("tiposDesdeCasillas con «Otros» y texto añade el texto libre tras los fijos", () => {
+  assert.deepEqual(tiposDesdeCasillas(["Otros"], "Toldos"), ["Toldos"]);
+  assert.deepEqual(tiposDesdeCasillas(["Tela", "Otros"], "Toldos"), ["Tela", "Toldos"]);
+  assert.deepEqual(tiposDesdeCasillas(["Estructuras", "Tela", "Otros"], "Toldos"), ["Tela", "Estructuras", "Toldos"]);
+});
+
+test("tiposDesdeCasillas parte el texto por comas, lo recorta y descarta los vacíos", () => {
+  assert.deepEqual(tiposDesdeCasillas(["Otros"], "  Toldos , ,  Velas "), ["Toldos", "Velas"]);
+  // tolerante: texto contenido sin marcar «Otros» no se pierde (el formulario lo vacía al desmarcar)
+  assert.deepEqual(tiposDesdeCasillas([], "Toldos, Velas"), ["Toldos", "Velas"]);
+});
+
+test("tiposDesdeCasillas convierte un texto igual a un fijo en el valor fijo (RF-1403)", () => {
+  assert.deepEqual(tiposDesdeCasillas([], " tela "), ["Tela"]);
+  assert.deepEqual(tiposDesdeCasillas([], "ESPUMA"), ["Espuma"]);
+  assert.deepEqual(tiposDesdeCasillas([], "Éstructuras"), ["Estructuras"]); // sin acentos ni mayúsculas
+  assert.deepEqual(tiposDesdeCasillas(["Otros"], "Tela"), ["Tela"]); // no se guarda como libre
+});
+
+test("tiposDesdeCasillas no duplica (casilla + texto del mismo fijo) y conserva el orden de los libres", () => {
+  assert.deepEqual(tiposDesdeCasillas(["Tela"], "Tela"), ["Tela"]);
+  assert.deepEqual(tiposDesdeCasillas(["Tela"], "tela"), ["Tela"]);
+  assert.deepEqual(tiposDesdeCasillas(["Tela", "Otros"], "Toldos, toldos, Toldos"), ["Tela", "Toldos", "toldos"]);
+  // el fijo escrito en el texto entra en su posición canónica, sin duplicar la casilla
+  assert.deepEqual(tiposDesdeCasillas(["Estructuras"], "tela"), ["Tela", "Estructuras"]);
+  assert.deepEqual(tiposDesdeCasillas([], "Toldos, Toldos"), ["Toldos"]);
+});
+
+test("tiposDesdeCasillas tolera entradas raras sin lanzar (marcados no array, valores desconocidos)", () => {
+  assert.deepEqual(tiposDesdeCasillas(undefined, undefined), []);
+  assert.deepEqual(tiposDesdeCasillas("Tela", ""), []);
+  assert.deepEqual(tiposDesdeCasillas(["Madera"], ""), []);
+  assert.deepEqual(tiposDesdeCasillas([null, "Espuma"], ""), ["Espuma"]);
 });
 
 // --- filtros por pertenencia (RF-1205) ---

@@ -166,51 +166,53 @@ function guardarClientes() {
 // Formulario
 // =====================================================
 
-// --- Tipo de cliente: desplegable + campo condicional (spec 016, RF-1401/1402/1403) ---
-// El <select> tiene 5 opciones (Sin tipo vacía + 3 fijos + Otros); al elegir
-// «Otros» aparece el campo de texto (oculto con hidden, no ocupa espacio). El
-// desplegable es de SELECCIÓN ÚNICA (Decisión 4 de la spec 016): el array `tipos`
-// se construye con la sola elección del desplegable; un multi-tipo importado
-// solo conserva su primer tipo al editar (limitación documentada).
-const campoTipo = document.getElementById("tipo");
+// --- Tipo de cliente: casillas múltiples + campo condicional (spec 016 →
+// selección múltiple, RF-1401/1402/1403) ---
+// Cuatro casillas (Tela, Espuma, Estructuras, Otros) que se marcan de una en
+// una: se puede marcar varias, una sola o ninguna (nada obligatorio, spec 007).
+// Al marcar «Otros» aparece el campo de texto (oculto con hidden, no ocupa
+// espacio); al desmarcarlo el texto se descarta (RF-1402). El paso de casillas +
+// texto al array `tipos` es la pura tiposDesdeCasillas() de logica.js.
+const casillasTipos = Array.prototype.slice.call(
+  document.querySelectorAll(".casillas-tipos input[type='checkbox']")
+);
 const campoTipoOtro = document.getElementById("tipo-otro");
 const campoTipoOtroContenedor = document.getElementById("campo-tipo-otro");
+const casillaOtros = document.getElementById("tipo-otros");
 
-// Muestra u oculta el campo condicional según la opción del desplegable.
+// Muestra u oculta el campo condicional según la casilla «Otros».
 // Al ocultarlo también se vacía su valor (el texto escrito no cuenta si se
-// cambia de opción; RF-1402)
+// desmarca la casilla; RF-1402)
 function alternarCampoOtro() {
-  const otros = campoTipo.value === "Otros";
+  const otros = casillaOtros.checked;
   campoTipoOtroContenedor.hidden = !otros;
   if (!otros) campoTipoOtro.value = "";
 }
 
-// El desplegable cambió: muestra u oculta el campo condicional
-campoTipo.addEventListener("change", alternarCampoOtro);
+// La casilla «Otros» cambió: muestra u oculta el campo condicional
+casillaOtros.addEventListener("change", alternarCampoOtro);
 
-// Lee el desplegable y el campo condicional y devuelve la lista `tipos` (array):
-// «Sin tipo» → []; fijo → [fijo]; «Otros» → [texto recortado] o ["Otros"] si
-// vacío; texto que coincide con un fijo escrito en «Otros» → se guarda como fijo
-// (RF-1403). Este es el ÚNICO punto donde el formulario convierte la elección
-// en el array que la lógica pura ya sabe manejar (construirCliente/actualizarCliente).
-function tiposDesdeFormulario() {
-  const elegido = campoTipo.value;
-  if (elegido === "") return [];                 // «Sin tipo»
-  if (elegido !== "Otros") return [elegido];     // tipo fijo
-  // «Otros»: el texto del campo condicional; vacío → «Otros»
-  // (nombre «textoOtro», no «texto»: una constante local llamada `texto`
-  // sombrearía la función global texto() de logica.js, revisión global B7)
-  const textoOtro = campoTipoOtro.value.trim();
-  if (textoOtro === "") return ["Otros"];
-  // Si el texto coincide con un tipo fijo escrito a mano, se guarda como fijo
-  // (mismo criterio que la lógica añadirTipoLibre, RF-1403)
-  return [textoOtro];
+// Valores de las casillas marcadas (p. ej. ["Tela", "Otros"]), en orden del formulario
+function tiposMarcados() {
+  return casillasTipos
+    .filter(function (casilla) { return casilla.checked; })
+    .map(function (casilla) { return casilla.value; });
 }
 
-// Reset del formulario: desplegable en «Sin tipo», campo oculto y vacío
-// (nada obligatorio, spec 007)
+// Lee las casillas marcadas y el campo condicional y devuelve la lista `tipos`
+// (array): todo lo aplica tiposDesdeCasillas() — nada → []; fijos en orden
+// canónico; texto libre (se parte por «, ») tras los fijos; «Otros» marcado sin
+// texto → ["Otros"]; texto igual a un fijo → fijo (RF-1403). Este es el ÚNICO
+// punto donde el formulario convierte la elección en el array que la lógica pura
+// ya sabe manejar (construirCliente/aplicarEdicion).
+function tiposDesdeFormulario() {
+  return tiposDesdeCasillas(tiposMarcados(), campoTipoOtro.value);
+}
+
+// Reset del formulario: casillas desmarcadas y campo condicional vacío y oculto
+// (formulario.reset() también lo vacía; nada obligatorio, spec 007)
 function resetearFormulario() {
-  formulario.reset(); // también vacía el <select> y el campo condicional
+  formulario.reset();
   alternarCampoOtro();
 }
 
@@ -231,7 +233,8 @@ formulario.addEventListener("submit", function (evento) {
     return;
   }
 
-  // Alta con el tipo elegido en el desplegable (spec 016, RF-1403): la lógica
+  // Alta con el tipo elegido en las casillas (spec 016 → selección múltiple,
+  // RF-1403): la lógica
   // normaliza y escribe `tipos` + `tipo` = tipos[0] ?? ""
   clientes.push(construirCliente(datos, Date.now(), Date.now(), tiposDesdeFormulario()));
 
@@ -421,23 +424,24 @@ function iniciarEdicion(id) {
   // Provincia con la única regla de lectura (RF-1302 / T-02): tolera clientes
   // antiguos sin el campo y recorta; nunca `cliente.provincia` a pelo
   formulario.provincia.value = provinciaCliente(cliente);
-  // Tipo del cliente en el desplegable (spec 016, RF-1404): primer tipo de
-  // tiposCliente(cliente); si es un tipo fijo → desplegable en ese fijo; si es
-  // libre/«Otros» → desplegable en «Otros» con el texto cargado; vacío → «Sin tipo».
-  // Un multi-tipo importado solo conserva su primer tipo (Decisión 4)
+  // Tipos del cliente en las casillas (spec 016 → selección múltiple, RF-1404):
+  // cada tipo fijo de tiposCliente deja SU casilla marcada; los tipos LIBRES van
+  // al campo de texto separados por «, » con la casilla «Otros» marcada; el
+  // literal «Otros» (guardado por la 008/016 con el campo vacío) solo marca la
+  // casilla y deja el texto vacío (RF-1404). Ningún tipo existente se pierde: al
+  // guardar sin tocar nada, tiposDesdeCasillas() reconstruye la misma lista
+  // (los fijos en orden canónico y los libres en su orden de escritura).
   const tipos = tiposCliente(cliente);
-  const primero = tipos.length > 0 ? tipos[0] : "";
-  if (esTipoFijo(primero)) {
-    campoTipo.value = primero;       // desplegable en el fijo
-  } else if (primero !== "") {
-    campoTipo.value = "Otros";       // desplegable en «Otros» + texto cargado
-    // El literal «Otros» (guardado por la 008 con el campo vacío) deja el
-    // campo vacío, no el texto «Otros» (RF-1404)
-    campoTipoOtro.value = primero === "Otros" ? "" : primero;
-  } else {
-    campoTipo.value = "";            // «Sin tipo»
-  }
-  alternarCampoOtro();               // oculta el campo si no es «Otros»
+  const tiposLibres = tipos.filter(function (tipo) {
+    return !esTipoFijo(tipo) && tipo !== "Otros";
+  });
+  casillasTipos.forEach(function (casilla) {
+    casilla.checked = casilla.value === "Otros"
+      ? tipos.some(function (tipo) { return !esTipoFijo(tipo); })
+      : tipos.indexOf(casilla.value) !== -1;
+  });
+  campoTipoOtro.value = tiposLibres.join(", ");
+  alternarCampoOtro();               // oculta el campo si «Otros» no está marcado
   formulario.notas.value = cliente.notas || "";
 
   pintarFormularioModo();
@@ -473,7 +477,8 @@ function guardarEdicion(datos) {
   }
 
   // Actualizamos los campos conservando id y fecha originales (ver logica.js);
-  // el tipo viene del desplegable del formulario (tiposDesdeFormulario, RF-1403)
+  // el tipo viene de las casillas del formulario (tiposDesdeFormulario →
+  // tiposDesdeCasillas, RF-1403)
   clientes = aplicarEdicion(clientes, clienteEditandoId, datos, tiposDesdeFormulario());
 
   // Guardado protegido (revisión global, M2): si la escritura falla, la edición

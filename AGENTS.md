@@ -83,7 +83,8 @@ funcionar sin servidor. La misma web se empaqueta como **aplicación de escritor
   «Sin nombre»/«Sin tipo» cuando faltan. Campos **Móvil** y **Código postal** en
   formulario, ficha y buscador; el mapa usa dirección + código postal.
 - ~~Desplegable de tipo con «Otros» (spec 008)~~: retirado por la 014 y **su interfaz
-  restaurada por la spec 016** (ver «Desplegable de tipo (spec 016)» abajo). Sigue
+  restaurada por la spec 016**, que a su vez **sustituyó el desplegable por casillas de
+  selección múltiple (2026-10-20)** (ver «Desplegable de tipo (spec 016)» abajo). Sigue
   vigente lo demás de la 008: los tipos no fijos se agrupan en la pestaña de filtro
   **Otros** (violeta) y comparten ese color en la ficha; los «Sin tipo» siguen solo en
   «Todos».
@@ -121,8 +122,9 @@ funcionar sin servidor. La misma web se empaqueta como **aplicación de escritor
   cabecera de contexto ya lo lleva). Sin claves nuevas ni dependencias: es presentación
   pura (`@media print`). **Dos puntos derogados por la 017**: el botón ya no llama a `window.print()` directamente (abre la vista previa) y la app de escritorio **sí** genera el PDF; la guardia de cero visibles, la cabecera de contexto en `beforeprint` y la hoja limpia siguen intactas (ahora en `hoja-impresion.css`).
 - **Tipos múltiples (spec 014)**: un cliente admite **varios tipos a la vez**. *(La
-  interfaz de chips que introdujo aquí **fue sustituida por la spec 016** —desplegable
-  de selección única—; abajo solo queda lo que sigue vigente.)* Los filtros son
+  interfaz de chips que introdujo aquí **fue sustituida por la spec 016** —primero
+  desplegable de selección única, hoy **casillas de selección múltiple**—; abajo solo
+  queda lo que sigue vigente.)* Los filtros son
   **por pertenencia**: un multi-tipo sale en cada pestaña de
   sus tipos y en **«Otros»** si tiene tipos libres (los sin tipos solo en «Todos»). La
   tarjeta pinta **un badge por tipo** con el **canto del primer tipo**; el listado y la
@@ -157,6 +159,25 @@ funcionar sin servidor. La misma web se empaqueta como **aplicación de escritor
   el tipo elegido (limitación aceptada de la **selección única**). `logica.js` y los
   tests **intactos** (122/122, cero tests nuevos); los chips del **listado** (spec 012)
   no cambian.
+  *(**SUSTITUIDO el 2026-10-20** por **casillas de selección múltiple** a petición del
+  usuario («Quita el desplegable y pon los tipos para que se puedan seleccionar de uno
+  en uno»; cambio pequeño sin spec, misma fórmula que la revisión global). El `<select>`
+  desapareció: ahora son **cuatro casillas** `Tela | Espuma | Estructuras | Otros` en
+  `<div class="casillas-tipos" role="group" aria-label="Tipo de cliente">` (etiquetas
+  `<label for>`, casilla 20 px dentro de un objetivo **≥44 px**, foco visible en la
+  casilla entera vía `:focus-within`), marcables **varias a la vez o ninguna**. El
+  **campo condicional sigue igual** (solo al marcar «Otros», texto descartado al
+  desmarcar, RF-1402). El mapeo pasó a `app.js` (`tiposDesdeFormulario()` solo lee el
+  DOM) → helper puro **`tiposDesdeCasillas(marcados, textoLibre)` en `logica.js`**
+  (**+8 tests → 141/141**): nada → `[]`; fijos en **orden canónico**; el texto se
+  **parte por «, », se recorta, se deduplica** y va tras los fijos; «Otros» marcado
+  **sin texto** → `["Otros"]`; texto igual a un fijo (`normalizar`, RF-1403) → fijo.
+  Edición: **cada** fijo marca su casilla y los tipos **libres** van al campo unidos
+  por «, » con «Otros» marcado (literal «Otros» → campo **vacío**, RF-1404) → **los
+  multi-tipo ya no pierden nada al editar** (se acabó la limitación de la selección
+  única). Retirados `.campo select` y `.campo select:focus` (sin uso; el desplegable
+  de provincia tiene los suyos). `tipo` = `tipos[0] ?? ""` intacto, sin claves nuevas y
+  los chips del **listado** (spec 012) sin cambios.)*
 - **Vista previa de impresión y PDF (spec 017)**: el botón **«Imprimir»** ya no abre el
   diálogo del navegador (deroga el RF-1102 de la 013): abre una **vista previa dentro
   de la app** (clase `modo-vista-previa` en `<body>` + `#estilo-hoja` conmutado de

@@ -134,19 +134,33 @@
           </datalist>
         </div>
 
-        <!-- Tipo de cliente (spec 016, RF-1401): desplegable clásico con «Otros» + campo condicional.
-             El campo de texto aparece SOLO al elegir «Otros» y se oculta con hidden (no ocupa espacio).
-             Mapeo al guardar: fijo → [tipo]; «Otros» → [texto recortado] o ["Otros"] si vacío;
-             «Sin tipo» → []; texto coincidente con un fijo se guarda como fijo (RF-1403). -->
+        <!-- Tipo de cliente (spec 016 → SELECCIÓN MÚLTIPLE con casillas): cuatro
+             casillas que se marcan de una en una (varias a la vez o ninguna) y
+             campo de texto condicional que SOLO aparece al marcar «Otros» (hidden,
+             sin espacio; el texto se descarta al desmarcar, RF-1402).
+             Mapeo al guardar en tiposDesdeCasillas() (logica.js): nada → «Sin tipo»;
+             fijos en orden canónico; texto libre tras los fijos; «Otros» sin texto →
+             «Otros»; texto igual a un fijo → fijo (RF-1403). -->
         <div class="campo">
-          <label for="tipo">Tipo de cliente</label>
-          <select id="tipo" name="tipo">
-            <option value="" selected>Sin tipo</option>
-            <option value="Tela">Tela</option>
-            <option value="Espuma">Espuma</option>
-            <option value="Estructuras">Estructuras</option>
-            <option value="Otros">Otros</option>
-          </select>
+          <span class="campo-etiqueta">Tipo de cliente</span>
+          <div class="casillas-tipos" role="group" aria-label="Tipo de cliente">
+            <label class="casilla" for="tipo-tela">
+              <input type="checkbox" id="tipo-tela" value="Tela">
+              <span>Tela</span>
+            </label>
+            <label class="casilla" for="tipo-espuma">
+              <input type="checkbox" id="tipo-espuma" value="Espuma">
+              <span>Espuma</span>
+            </label>
+            <label class="casilla" for="tipo-estructuras">
+              <input type="checkbox" id="tipo-estructuras" value="Estructuras">
+              <span>Estructuras</span>
+            </label>
+            <label class="casilla" for="tipo-otros">
+              <input type="checkbox" id="tipo-otros" value="Otros">
+              <span>Otros</span>
+            </label>
+          </div>
         </div>
         <div class="campo campo-condicional" id="campo-tipo-otro" hidden>
           <label for="tipo-otro">Escribe el tipo de cliente</label>

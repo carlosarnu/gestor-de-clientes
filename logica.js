@@ -260,7 +260,9 @@ function migrarTipos(lista) {
 }
 
 // =====================================================
-// Chips del formulario de tipos (spec 014)
+// Tipos del formulario: helpers de la 014 (chips, ya fuera del formulario) y
+// tiposDesdeCasillas, el mapeo al guardar del formulario ACTUAL (spec 016 →
+// selección múltiple con casillas)
 // =====================================================
 
 // Lista NUEVA con el chip fijo alternado (RF-1203): si estaba marcado, se quita;
@@ -292,6 +294,55 @@ function quitarTipoLibre(tipos, tipo) {
   const lista = normalizarTipos(tipos);
   const valor = texto(tipo);
   return lista.filter(function (t) { return t !== valor; });
+}
+
+// Mapeo al guardar del formulario de CASILLAS (spec 016 → selección múltiple):
+// `marcados` son los valores marcados entre «Tela»/«Espuma»/«Estructuras»/«Otros»
+// y `textoLibre` el campo condicional, que se parte por «, », se recorta y se
+// descartan los vacíos. Reglas: nada → [] («Sin tipo»); los fijos van SIEMPRE en
+// orden canónico (Tela, Espuma, Estructuras); el texto libre va tras los fijos y
+// conserva su orden; «Otros» marcado SIN texto → «Otros»; un texto que coincide
+// con un fijo (normalizar: sin acentos ni mayúsculas, RF-1403) se guarda como
+// FIJO; sin duplicados exactos. No muta la entrada y no trunca (el límite de 40
+// caracteres es solo del formulario). Tolera `marcados` no array (→ []) y
+// cualquier valor no texto (texto() lo recorta); los valores desconocidos se
+// ignoran. El texto sin «Otros» marcado también se conserva: la casilla no
+// debería llegar desmarcada con contenido (el formulario lo vacía), y así no se
+// pierde lo que el usuario haya escrito.
+function tiposDesdeCasillas(marcados, textoLibre) {
+  const elegidos = Array.isArray(marcados) ? marcados.map(function (valor) {
+    return texto(valor);
+  }) : [];
+  const fragmentos = texto(textoLibre).split(",").map(function (pieza) {
+    return pieza.trim();
+  }).filter(function (pieza) {
+    return pieza !== "";
+  });
+
+  // Fijos elegidos por casilla; el texto puede sumar alguno más (escrito a mano)
+  const fijosPresentes = elegidos.filter(function (valor) {
+    return TIPOS_FIJOS.indexOf(valor) !== -1;
+  });
+  const libres = [];
+  fragmentos.forEach(function (fragmento) {
+    const fijo = TIPOS_FIJOS.filter(function (candidato) {
+      return normalizar(candidato) === normalizar(fragmento);
+    })[0];
+    if (fijo !== undefined) {
+      if (fijosPresentes.indexOf(fijo) === -1) fijosPresentes.push(fijo);
+      return;
+    }
+    if (libres.indexOf(fragmento) === -1) libres.push(fragmento);
+  });
+
+  // Fijos en orden canónico + libres en orden de escritura; «Otros» literal solo
+  // si la casilla está marcada y el texto no aporta nada (vacío o solo comas);
+  // si aporta —fijo o libre— manda el texto
+  const salida = TIPOS_FIJOS.filter(function (fijo) {
+    return fijosPresentes.indexOf(fijo) !== -1;
+  }).concat(libres);
+  if (elegidos.indexOf("Otros") !== -1 && fragmentos.length === 0) salida.push("Otros");
+  return salida;
 }
 
 // Filtro de pestañas por PERTENENCIA (RF-1205): "Todos" → toda la lista; un tipo
@@ -702,6 +753,7 @@ if (typeof module !== "undefined" && module.exports) {
     alternarTipoFijo,
     añadirTipoLibre,
     quitarTipoLibre,
+    tiposDesdeCasillas,
     unirTiposTexto,
     CATALOGO_CAMPOS,
     normalizarSeleccion,

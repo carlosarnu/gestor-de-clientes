@@ -124,11 +124,12 @@ h2 {
   width: 100%;
 }
 
-/* El mismo aspecto de foco para inputs, textareas Y el desplegable del tipo
-   (revisión global, B9): antes el <select> no recibía outline al enfocarlo */
+/* El mismo aspecto de foco para inputs y textareas (revisión global, B9). El
+   `.campo select:focus` de B9 quedó SIN USO al retirarse el desplegable de tipo
+   (spec 016 → casillas): el único <select> que queda, el de provincia, se rige
+   por .filtro-provincia-select:focus-visible */
 .campo input:focus,
-.campo textarea:focus,
-.campo select:focus {
+.campo textarea:focus {
   outline: 2px solid var(--tinta);
   outline-offset: 1px;
   border-color: var(--tinta);
@@ -138,20 +139,65 @@ h2 {
   resize: vertical;
 }
 
-/* Desplegable del tipo de cliente + campo condicional «Otros» (spec 016,
-   RF-1401/1402): el select hereda los estilos de .campo input/textarea */
-.campo select {
-  font: inherit;
-  width: 100%;
-  padding: 12px 14px; /* mínimo 44 px de alto para el pulgar */
+/* Etiqueta de grupo que no es <label> (el grupo de casillas lleva su propio
+   aria-label): mismo aspecto que .campo label */
+.campo-etiqueta {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--tinta-media);
+}
+
+/* Casillas del tipo de cliente (spec 016 → SELECCIÓN MÚLTIPLE, RF-1401): varias
+   marcadas a la vez o ninguna; objetivo táctil ≥44 px y foco visible coherente
+   con el resto del formulario (el outline pasa a la casilla entera) */
+.casillas-tipos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.casilla {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px; /* objetivo táctil */
+  padding: 10px 14px;
   border: 1px solid var(--linea);
   border-radius: var(--radio);
   background: var(--superficie);
   color: var(--tinta);
+  font-size: 0.9rem;
+  font-weight: 600;
   cursor: pointer;
 }
 
-/* Campo condicional: oculto con hidden (no ocupa espacio) salvo al elegir
+.casilla:hover {
+  background: var(--linea-suave);
+}
+
+/* El checkbox manda la casilla: aquí se anula el estilo de .campo input
+   (width/padding/borde) para que la caja quede de 20 px dentro de los 44 px) */
+.casilla input {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--tinta);
+  cursor: pointer;
+}
+
+.casilla input:focus {
+  outline: none; /* el foco lo pinta la casilla entera (focus-within) */
+}
+
+.casilla:focus-within {
+  outline: 2px solid var(--tinta);
+  outline-offset: 1px;
+  border-color: var(--tinta);
+}
+
+/* Campo condicional: oculto con hidden (no ocupa espacio) salvo al marcar
    «Otros»; el estado lo alterna app.js (alternarCampoOtro) */
 .campo-condicional[hidden] {
   display: none;
