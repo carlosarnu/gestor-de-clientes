@@ -228,30 +228,95 @@
         <p class="contador" id="contador"></p>
       </div>
 
-      <!-- Buscador por texto (spec 005) -->
+      <!-- Barra de filtros (spec 018, RF-1601/RF-1602/RF-1603): EXACTAMENTE dos
+           desplegables con casillas —«Tipo de cliente» y «Provincia»— ocupando el
+           hueco de las pestañas (RF-1205/RF-104 derogados) y del <select> único de
+           provincia de la 015 (RF-1305 derogado), ANTES del buscador que queda al
+           final de la barra. Cada desplegable: un trigger <button> con su etiqueta
+           dinámica («Tipo: Todos» / «Tipo: Tela, Espuma (2)») + un panel oculto por
+           defecto (hidden) con casillas <input type="checkbox"> del MISMO patrón
+           visual del formulario (.casilla: caja de 20 px dentro de un objetivo
+           ≥44 px, foco visible en la casilla entera) y su botón «Limpiar»
+           (RF-1601/RF-1606). El panel de tipo lleva las CINCO casillas fijas en su
+           orden (Tela, Espuma, Estructuras, Otros, Sin tipo); el de provincia se
+           rellena en memoria desde app.js (espejo de los datos) con la casilla FIJA
+           «Sin provincia» anclada AL FINAL, siempre visible (RF-1603). Los paneles
+           son hijos de la barra: la hoja oculta .barra-filtros entera, así que ni
+           triggers, ni paneles, ni casillas viajan al papel ni al PDF (RF-1606).
+           Las marcas viven SOLO en memoria: ninguna clave nueva (RF-1609) -->
+      <div class="barra-filtros">
+        <!-- Grupo TIPO: cinco casillas estáticas (RF-1602) -->
+        <div class="desplegable-filtro" id="filtro-tipo">
+          <button type="button" class="trigger-filtro" id="trigger-tipo"
+                  aria-expanded="false" aria-controls="panel-tipo">
+            <span class="trigger-texto">Tipo: Todos</span>
+          </button>
+          <div class="panel-filtro" id="panel-tipo" role="group"
+               aria-label="Filtrar por tipo de cliente" hidden>
+            <div class="panel-casillas">
+              <label class="casilla" for="filtro-tipo-tela">
+                <input type="checkbox" id="filtro-tipo-tela" value="Tela">
+                <span>Tela</span>
+              </label>
+              <label class="casilla" for="filtro-tipo-espuma">
+                <input type="checkbox" id="filtro-tipo-espuma" value="Espuma">
+                <span>Espuma</span>
+              </label>
+              <label class="casilla" for="filtro-tipo-estructuras">
+                <input type="checkbox" id="filtro-tipo-estructuras" value="Estructuras">
+                <span>Estructuras</span>
+              </label>
+              <label class="casilla" for="filtro-tipo-otros">
+                <input type="checkbox" id="filtro-tipo-otros" value="Otros">
+                <span>Otros</span>
+              </label>
+              <label class="casilla" for="filtro-tipo-sin-tipo">
+                <input type="checkbox" id="filtro-tipo-sin-tipo" value="Sin tipo">
+                <span>Sin tipo</span>
+              </label>
+            </div>
+            <div class="panel-pie">
+              <button type="button" class="boton-secundario panel-limpiar"
+                      data-limpiar="tipo">Limpiar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Grupo PROVINCIA: casillas dinámicas (espejo de los datos, RF-1603) +
+             casilla FIJA «Sin provincia» anclada al final + «Limpiar» -->
+        <div class="desplegable-filtro" id="filtro-provincia">
+          <button type="button" class="trigger-filtro" id="trigger-provincia"
+                  aria-expanded="false" aria-controls="panel-provincias">
+            <span class="trigger-texto">Provincia: Todas</span>
+          </button>
+          <div class="panel-filtro" id="panel-provincias" role="group"
+               aria-label="Filtrar por provincia" hidden>
+            <!-- Una casilla por provincia de los clientes que pasan el grupo tipo
+                 (únicas por normalizar, orden alfabético «es»): app.js la genera
+                 aquí con escaparAtributo (texto libre de los datos) -->
+            <div class="panel-casillas" id="casillas-provincias"></div>
+            <!-- Opción FIJA, siempre presente y SIEMPRE al final del panel: no
+                 depende de los datos ni del grupo tipo y nunca se desmarca sola
+                 por repueblado (RF-1603/RF-1605, Decisión 11). Su value vacío es
+                 la marca SIN_PROVINCIA de logica.js (provincia vacía o ausente) -->
+            <label class="casilla" for="filtro-provincia-sin-provincia">
+              <input type="checkbox" id="filtro-provincia-sin-provincia" value="">
+              <span>Sin provincia</span>
+            </label>
+            <div class="panel-pie">
+              <button type="button" class="boton-secundario panel-limpiar"
+                      data-limpiar="provincia">Limpiar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Buscador por texto (spec 005): SIN CAMBIOS de interfaz ni de
+           semántica (RF-1601, spec 005 intacta) y al final de la barra -->
       <div class="buscador">
         <label for="buscador">Buscar cliente</label>
         <input type="search" id="buscador" autocomplete="off"
                placeholder="Empresa, contacto, CIF…">
-      </div>
-
-      <div class="filtros" id="filtros">
-        <button type="button" class="filtro activo" data-filtro="Todos">Todos</button>
-        <button type="button" class="filtro" data-filtro="Tela">Tela</button>
-        <button type="button" class="filtro" data-filtro="Espuma">Espuma</button>
-        <button type="button" class="filtro" data-filtro="Estructuras">Estructuras</button>
-        <button type="button" class="filtro" data-filtro="Otros">Otros</button>
-      </div>
-
-      <!-- Filtro por provincia (spec 015, RF-1305): desplegable junto a las
-           pestañas de tipo. La opción «Todas las provincias» (por defecto) está
-           en el HTML; el repoblado con las provincias de los clientes —y la
-           combinación en Y con tipo y búsqueda— lo hace app.js (T-05) -->
-      <div class="filtro-provincia-bloque">
-        <label class="filtro-provincia" for="filtro-provincia">Provincia</label>
-        <select id="filtro-provincia" class="filtro-provincia-select">
-          <option value="" selected>Todas las provincias</option>
-        </select>
       </div>
 
       <!-- Copia de seguridad (spec 011, RF-901): exportar e importar -->

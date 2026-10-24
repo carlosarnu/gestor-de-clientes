@@ -12,6 +12,9 @@ const {
   coincideProvincia,
   filtrarPorProvincia,
   provinciaValida,
+  SIN_PROVINCIA,
+  marcasProvinciaValidas,
+  nombreMarcasProvincias,
   construirCliente,
   actualizarCliente,
   buscarClientes,
@@ -109,29 +112,60 @@ const LISTA_PROVINCIAS = [
   { id: 5, empresa: "Otro cadiz", provincia: undefined, tipos: ["Espuma"], tipo: "Espuma" }
 ];
 
-test("filtrarPorProvincia con «» devuelve la lista completa y con provincia solo la coincidente normalizada (RF-1305)", () => {
-  assert.deepEqual(filtrarPorProvincia(LISTA_PROVINCIAS, ""), LISTA_PROVINCIAS);
-  assert.deepEqual(filtrarPorProvincia(LISTA_PROVINCIAS, "  "), LISTA_PROVINCIAS);
-  assert.deepEqual(filtrarPorProvincia(LISTA_PROVINCIAS, "Málaga").map(c => c.id), [2]);
-  // «Cádiz» y «cadiz» son la misma provincia PARA EL Filtro (los datos no cambian)
-  assert.deepEqual(filtrarPorProvincia(LISTA_PROVINCIAS, "cadiz").map(c => c.id), [1, 3]);
-  // los sin provincia solo salen en «Todas»: nunca en una provincia concreta
-  assert.equal(filtrarPorProvincia(LISTA_PROVINCIAS, "Cádiz").some(c => c.id === 4 || c.id === 5), false);
+test("filtrarPorProvincia con la lista vacía devuelve la lista completa y con provincia solo la coincidente normalizada (RF-1305, RF-1603)", () => {
+  assert.deepEqual(filtrarPorProvincia(LISTA_PROVINCIAS, []), LISTA_PROVINCIAS);
+  assert.deepEqual(filtrarPorProvincia(LISTA_PROVINCIAS, ["Málaga"]).map(c => c.id), [2]);
+  // «Cádiz» y «cadiz» son la misma provincia PARA EL filtro (los datos no cambian)
+  assert.deepEqual(filtrarPorProvincia(LISTA_PROVINCIAS, ["cadiz"]).map(c => c.id), [1, 3]);
+  // con una provincia real marcada, los sin provincia NO pasan si la fija no está marcada
+  assert.equal(filtrarPorProvincia(LISTA_PROVINCIAS, ["Cádiz"]).some(c => c.id === 4 || c.id === 5), false);
 });
 
-test("filtrarPorProvincia se combina en Y con el filtro de tipo (RF-1305)", () => {
-  const porTipo = filtrarClientes(LISTA_PROVINCIAS, "Tela"); // ids 1, 2, 4
-  assert.deepEqual(filtrarPorProvincia(porTipo, "Cádiz").map(c => c.id), [1]);
-  assert.deepEqual(filtrarPorProvincia(porTipo, "Málaga").map(c => c.id), [2]);
-  assert.deepEqual(filtrarPorProvincia(porTipo, "Cádiz").length, 1);
+test("filtrarPorProvincia se combina en Y con el filtro de tipo (RF-1305, RF-1604)", () => {
+  const porTipo = filtrarClientes(LISTA_PROVINCIAS, ["Tela"]); // ids 1, 2, 4
+  assert.deepEqual(filtrarPorProvincia(porTipo, ["Cádiz"]).map(c => c.id), [1]);
+  assert.deepEqual(filtrarPorProvincia(porTipo, ["Málaga"]).map(c => c.id), [2]);
+  assert.deepEqual(filtrarPorProvincia(porTipo, ["Cádiz"]).length, 1);
 });
 
-// ===== 5. Selección válida (RF-1305) =====
+// ===== 5. Validación de marcas de provincia (spec 018, RF-1605) =====
 
-test("provinciaValida conserva la selección si existe entre las opciones (forma normalizada) y si no → «» (RF-1305)", () => {
+test("marcasProvinciaValidas conserva las marcas existentes alineadas a la primera forma guardada (RF-1605)", () => {
+  const opciones = ["Cádiz", "MÁLAGA", "Valencia"]; // salida de provinciasExistentes
+  assert.deepEqual(marcasProvinciaValidas(opciones, ["malaga"]), ["MÁLAGA"]);  // homófono alineado
+  assert.deepEqual(marcasProvinciaValidas(opciones, ["  Cádiz  "]), ["Cádiz"]); // recortado y alineado
+  assert.deepEqual(marcasProvinciaValidas(opciones, ["Valencia"]), ["Valencia"]);
+  assert.deepEqual(marcasProvinciaValidas(opciones, ["Valencia", "malaga"]), ["Valencia", "MÁLAGA"]);
+});
+
+test("marcasProvinciaValidas desmarca sola la marca huérfana que ya no existe entre las opciones (RF-1605)", () => {
+  const opciones = ["Valencia"];
+  assert.deepEqual(marcasProvinciaValidas(opciones, ["Castellón"]), []);            // desapareció
+  assert.deepEqual(marcasProvinciaValidas(opciones, ["Castellón", "Valencia"]), ["Valencia"]);
+  assert.deepEqual(marcasProvinciaValidas([], ["Valencia"]), []);                   // sin opciones
+  assert.deepEqual(marcasProvinciaValidas(opciones, []), []);                       // sin marcas
+  assert.deepEqual(marcasProvinciaValidas(opciones, undefined), []);                // no-array: sin marcas
+});
+
+test("marcasProvinciaValidas conserva SIEMPRE la fija SIN_PROVINCIA («»), nunca se desmarca sola (RF-1605, Decisión 11)", () => {
+  const opciones = ["Valencia"];
+  assert.equal(SIN_PROVINCIA, "");                       // la casilla fija se codifica como «»
+  assert.deepEqual(marcasProvinciaValidas(opciones, [""]), [""]);
+  assert.deepEqual(marcasProvinciaValidas(opciones, ["Castellón", ""]), [""]);    // la huérfana fuera, la fija dentro
+  assert.deepEqual(marcasProvinciaValidas([], ["", "Valencia"]), [""]);           // aun sin opciones ni sin-provincia en los datos
+  assert.deepEqual(marcasProvinciaValidas(opciones, ["", ""]), [""]);             // sin duplicar la fija
+});
+
+test("marcasProvinciaValidas unifica las variantes homófonas de una misma provincia en una sola marca (RF-1605)", () => {
+  const opciones = ["Cádiz", "Málaga"];
+  assert.deepEqual(marcasProvinciaValidas(opciones, ["cadiz", "CÁDIZ"]), ["Cádiz"]);
+  assert.deepEqual(marcasProvinciaValidas(opciones, ["MÁLAGA", "malaga"]), ["Málaga"]);
+});
+
+test("provinciaValida (compatibilidad de la 015, decisión T-05: se mantiene) delega en marcasProvinciaValidas", () => {
   const provincias = ["Cádiz", "MÁLAGA"]; // salida de provinciasExistentes: strings
-  assert.equal(provinciaValida(provincias, "malaga"), "malaga"); // sigue existiendo
-  assert.equal(provinciaValida(provincias, "Málaga"), "Málaga");
+  assert.equal(provinciaValida(provincias, "malaga"), "MÁLAGA"); // alineada a la primera forma (antes: «malaga» a secas)
+  assert.equal(provinciaValida(provincias, "Málaga"), "MÁLAGA"); // homófono alineado a la opción «MÁLAGA» (el filtrado no cambia: normaliza)
   assert.equal(provinciaValida(provincias, "  Cádiz  "), "Cádiz");
   assert.equal(provinciaValida(provincias, "Valencia"), "");    // ya no existe
   assert.equal(provinciaValida(provincias, ""), "");            // sin selección
@@ -238,28 +272,140 @@ test("importarClientes conserva los literales de error intactos con la provincia
 
 // ===== 11. Cabecera de impresión (RF-1308) =====
 
-test("textoContextoImpresion sin provincia es idéntica al texto actual de la 013 (RF-1308)", () => {
-  assert.equal(textoContextoImpresion("Tela", "", ""), "Gestor de Clientes · Filtro: Tela");
-  assert.equal(textoContextoImpresion("Todos", "casa", undefined), "Gestor de Clientes · Búsqueda: «casa»");
-  assert.equal(textoContextoImpresion("Otros", "", null), "Gestor de Clientes · Filtro: Otros");
-  assert.equal(textoContextoImpresion("Todos", "", ""), "Gestor de Clientes");
+test("textoContextoImpresion sin marcas de provincia es idéntica a la cabecera de la 013 (RF-1308, RF-1608)", () => {
+  assert.equal(textoContextoImpresion(["Tela"], "", []), "Gestor de Clientes · Filtro: Tela");
+  assert.equal(textoContextoImpresion([], "casa", undefined), "Gestor de Clientes · Búsqueda: «casa»");
+  assert.equal(textoContextoImpresion(["Otros"], "", []), "Gestor de Clientes · Filtro: Otros");
+  assert.equal(textoContextoImpresion([], "", []), "Gestor de Clientes");
 });
 
-test("textoContextoImpresion añade «Provincia: X» entre «Filtro» y «Búsqueda» (RF-1308)", () => {
+test("textoContextoImpresion añade «Provincia: X» entre «Filtro» y «Búsqueda» (RF-1308, RF-1608)", () => {
   assert.equal(
-    textoContextoImpresion("Tela", "casa", "Málaga"),
+    textoContextoImpresion(["Tela"], "casa", ["Málaga"]),
     "Gestor de Clientes · Filtro: Tela · Provincia: Málaga · Búsqueda: «casa»"
   );
   assert.equal(
-    textoContextoImpresion("Tela", "", "Málaga"),
+    textoContextoImpresion(["Tela"], "", ["Málaga"]),
     "Gestor de Clientes · Filtro: Tela · Provincia: Málaga"
   );
   assert.equal(
-    textoContextoImpresion("Todos", "", "Málaga"),
+    textoContextoImpresion([], "", ["Málaga"]),
     "Gestor de Clientes · Provincia: Málaga"
   );
   assert.equal(
-    textoContextoImpresion("Todos", "casa", "  "),
-    "Gestor de Clientes · Búsqueda: «casa»" // provincia vacía: sin cambio
+    textoContextoImpresion([], "casa", []),
+    "Gestor de Clientes · Búsqueda: «casa»" // grupo provincia vacío: sin pieza
   );
+});
+
+// ===== 12. Filtros múltiples por lista de marcas (spec 018, RF-1603/RF-1604) =====
+
+// Lista del acta de la 018: provincias variadas, sin provincia, sin campo y la
+// colisión de etiqueta «Sin provincia» escrita literalmente
+const LISTA_018 = [
+  { id: 1, empresa: "A", provincia: "Valencia", tipos: ["Tela"], tipo: "Tela" },
+  { id: 2, empresa: "B", provincia: "CÁDIZ", tipos: ["Espuma"], tipo: "Espuma" },
+  { id: 3, empresa: "C", provincia: "cadiz", tipos: ["Tela", "Espuma"], tipo: "Tela" },
+  { id: 4, empresa: "D", provincia: "", tipos: ["Tela"], tipo: "Tela" },
+  { id: 5, empresa: "E", provincia: "Sin provincia", tipos: [], tipo: "" }, // colisión de etiqueta (RF-1603)
+  { id: 6, empresa: "F", tipos: ["Toldos"], tipo: "Toldos" }               // sin campo provincia
+];
+
+test("filtrarPorProvincia con lista vacía o entrada no-array es sin filtro: la lista completa (RF-1603)", () => {
+  assert.deepEqual(filtrarPorProvincia(LISTA_018, []).map(c => c.id), [1, 2, 3, 4, 5, 6]);
+  // entrada no-array (defensivo, asunción del plan): sin filtro, nunca lanza
+  assert.deepEqual(filtrarPorProvincia(LISTA_018, "Valencia").map(c => c.id), [1, 2, 3, 4, 5, 6]);
+  assert.deepEqual(filtrarPorProvincia(LISTA_018, undefined).map(c => c.id), [1, 2, 3, 4, 5, 6]);
+  assert.deepEqual(filtrarPorProvincia([], []).map(c => c.id), []);
+});
+
+test("filtrarPorProvincia con marcas usa semántica «o» y normaliza acentos y mayúsculas (RF-1603)", () => {
+  assert.deepEqual(filtrarPorProvincia(LISTA_018, ["Valencia"]).map(c => c.id), [1]);
+  assert.deepEqual(filtrarPorProvincia(LISTA_018, ["cadiz"]).map(c => c.id), [2, 3]); // homófonos juntos
+  // «o»: el 3 es de cadiz (también) y no duplica
+  assert.deepEqual(filtrarPorProvincia(LISTA_018, ["valencia", "CÁDIZ"]).map(c => c.id), [1, 2, 3]);
+});
+
+test("filtrarPorProvincia: los sin provincia pasan con la lista vacía o con SIN_PROVINCIA, y no con reales sin la fija (RF-1603, RF-1604)", () => {
+  assert.deepEqual(filtrarPorProvincia(LISTA_018, [""]).map(c => c.id), [4, 6]);      // vacía o ausente
+  assert.deepEqual(filtrarPorProvincia(LISTA_018, [SIN_PROVINCIA]).map(c => c.id), [4, 6]); // la constante es «»
+  // con alguna provincia real marcada y la fija DESMARCADA, los sin provincia NO pasan
+  assert.equal(filtrarPorProvincia(LISTA_018, ["Valencia"]).some(c => c.id === 4 || c.id === 6), false);
+  // la fija junto a una provincia real: semántica «o» (sola o con «Sin provincia» escrita da lo mismo aquí)
+  assert.deepEqual(filtrarPorProvincia(LISTA_018, ["Valencia", SIN_PROVINCIA]).map(c => c.id), [1, 4, 6]);
+});
+
+test("filtrarPorProvincia con «Sin provincia» escrita literalmente: pasa por su texto, nunca por la fija (RF-1603, colisión)", () => {
+  // solo la opción normal «Sin provincia» (coincidencia de texto): el cliente 5
+  assert.deepEqual(filtrarPorProvincia(LISTA_018, ["Sin provincia"]).map(c => c.id), [5]);
+  // solo la casilla fija «»: el cliente 5 NO pasa (su provincia no está vacía)
+  assert.equal(filtrarPorProvincia(LISTA_018, [SIN_PROVINCIA]).some(c => c.id === 5), false);
+  // las dos juntas: los sin provincia (4 y 6) + el escrito (5)
+  assert.deepEqual(filtrarPorProvincia(LISTA_018, ["Sin provincia", SIN_PROVINCIA]).map(c => c.id), [4, 5, 6]);
+});
+
+test("el filtro de tipo y el de provincia se combinan en Y con «o» dentro del grupo provincia (RF-1604)", () => {
+  const porTipo = filtrarClientes(LISTA_018, ["Tela", "Espuma"]); // «y»: solo el 3 (tiene las dos)
+  assert.deepEqual(porTipo.map(c => c.id), [3]);
+  assert.deepEqual(filtrarPorProvincia(porTipo, ["Valencia", "Cádiz"]).map(c => c.id), [3]); // provincias en «o»
+  assert.deepEqual(filtrarPorProvincia(filtrarClientes(LISTA_018, ["Sin tipo"]), ["Valencia"]).map(c => c.id), []);
+  assert.deepEqual(filtrarPorProvincia(filtrarClientes(LISTA_018, ["Sin tipo"]), ["Sin provincia"]).map(c => c.id), [5]);
+  assert.deepEqual(filtrarPorProvincia(filtrarClientes(LISTA_018, ["Otros"]), [SIN_PROVINCIA]).map(c => c.id), [6]);
+});
+
+test("nombreMarcasProvincias traduce la fija «» a «Sin provincia» y el resto va tal cual (RF-1603)", () => {
+  assert.deepEqual(nombreMarcasProvincias([]), []);
+  assert.deepEqual(nombreMarcasProvincias(["Valencia", ""]), ["Valencia", "Sin provincia"]);
+  assert.deepEqual(nombreMarcasProvincias(["", "Cádiz"]), ["Sin provincia", "Cádiz"]);
+  assert.deepEqual(nombreMarcasProvincias([SIN_PROVINCIA]), ["Sin provincia"]);
+  // entrada no-array (defensivo): sin etiquetas, sin lanzar
+  assert.deepEqual(nombreMarcasProvincias(undefined), []);
+  assert.deepEqual(nombreMarcasProvincias("Valencia"), []);
+});
+
+// ===== 13. Cabecera de impresión con listas (spec 018, RF-1608) =====
+
+test("textoContextoImpresion une cada grupo con «, » y omite las piezas vacías (RF-1608)", () => {
+  // solo tipo, con N marcas
+  assert.equal(
+    textoContextoImpresion(["Tela", "Espuma"], "", []),
+    "Gestor de Clientes · Filtro: Tela, Espuma"
+  );
+  // solo provincia, con N marcas
+  assert.equal(
+    textoContextoImpresion([], "", ["Valencia", "Castellón"]),
+    "Gestor de Clientes · Provincia: Valencia, Castellón"
+  );
+  // los dos grupos + búsqueda: literal completo del criterio de aceptación
+  assert.equal(
+    textoContextoImpresion(["Tela", "Espuma"], "toldos", ["Valencia", "Castellón"]),
+    "Gestor de Clientes · Filtro: Tela, Espuma · Provincia: Valencia, Castellón · Búsqueda: «toldos»"
+  );
+  // ninguno de los dos grupos: sin pieza (equivalente al antiguo «Todos» + «Todas las provincias»)
+  assert.equal(textoContextoImpresion([], "", []), "Gestor de Clientes");
+});
+
+test("textoContextoImpresion imprime «Sin provincia» tal cual dentro de la pieza Provincia (RF-1608)", () => {
+  assert.equal(
+    textoContextoImpresion([], "", [SIN_PROVINCIA]),
+    "Gestor de Clientes · Provincia: Sin provincia"
+  );
+  assert.equal(
+    textoContextoImpresion([], "", ["Valencia", SIN_PROVINCIA]),
+    "Gestor de Clientes · Provincia: Valencia, Sin provincia"
+  );
+  // la provincia escrita literalmente «Sin provincia» es una marca de texto normal
+  assert.equal(
+    textoContextoImpresion([], "", ["Sin provincia"]),
+    "Gestor de Clientes · Provincia: Sin provincia"
+  );
+});
+
+test("textoContextoImpresion con listas devuelve texto plano sin HTML, con acentos y comillas tal cual (RF-1608)", () => {
+  const cabecera = textoContextoImpresion(["Espuma"], '  Mü "Hnos"  ', ["Málaga"]);
+  assert.equal(
+    cabecera,
+    'Gestor de Clientes · Filtro: Espuma · Provincia: Málaga · Búsqueda: «Mü "Hnos"»'
+  );
+  assert.equal(cabecera.indexOf("<"), -1); // sin marcas HTML
 });

@@ -126,8 +126,10 @@ h2 {
 
 /* El mismo aspecto de foco para inputs y textareas (revisión global, B9). El
    `.campo select:focus` de B9 quedó SIN USO al retirarse el desplegable de tipo
-   (spec 016 → casillas): el único <select> que queda, el de provincia, se rige
-   por .filtro-provincia-select:focus-visible */
+   (spec 016 → casillas) y, tras la spec 018, la página ya no tiene NINGÚN
+   <select>: el desplegable único de provincia (015) murió con las pestañas y los
+   dos desplegables de filtro son paneles con casillas — su trigger se rige por
+   .trigger-filtro:focus-visible y las casillas por .casilla:focus-within */
 .campo input:focus,
 .campo textarea:focus {
   outline: 2px solid var(--tinta);
@@ -241,11 +243,12 @@ h2 {
   background: var(--linea-suave);
 }
 
-/* Foco visible para navegar con teclado */
+/* Foco visible para navegar con teclado (el `.filtro:focus-visible` de las
+   pestañas se retiró con la 018: su relevo es el trigger de cada desplegable) */
 .boton-principal:focus-visible,
 .boton-secundario:focus-visible,
 .boton-tarjeta:focus-visible,
-.filtro:focus-visible {
+.trigger-filtro:focus-visible {
   outline: 2px solid var(--tinta);
   outline-offset: 2px;
 }
@@ -306,96 +309,123 @@ h2 {
   color: var(--tinta-suave);
 }
 
-.filtros {
+/* ===== Barra de filtros (spec 018, RF-1601/RF-1602/RF-1603/RF-1606) ===== */
+
+/* RETIRADO con la 018 (comentario del retiro, plan §3): de la barra de la 014/015
+   desaparecen `.filtros` (contenedor de las cinco pestañas), `.filtro`,
+   `.filtro:hover`, `.filtro.activo` y los `.filtro[data-filtro=…].activo` con su
+   paleta por material (RF-1205/RF-104 derogados), y `.filtro-provincia-bloque`,
+   `.filtro-provincia`, `.filtro-provincia-select` + `:hover`/`:focus-visible`
+   (RF-1305 derogado). En su hueco entra UN contenedor con los dos desplegables,
+   colocado antes del buscador (que queda al final de la barra) */
+.barra-filtros {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 16px;
 }
 
-.filtro {
-  font: inherit;
-  font-size: 0.9rem;
-  font-weight: 600;
-  padding: 11px 16px; /* mínimo 44 px de alto para el pulgar */
+/* Cada desplegable es el ancla position:relative de su panel: en escritorio los
+   dos comparten fila (flex 1 1 200px) y a 375 px cada uno baja a su propia línea
+   a ancho completo (max-width:100% + min-width:0 → sin desbordamiento) */
+.desplegable-filtro {
+  position: relative;
+  flex: 1 1 200px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Disparador (trigger): píldora ≥44 px con la etiqueta de estado en TEXTO VISIBLE
+   (RF-1606). El texto se corta con «…» cuando no cabe (overflow/ellipsis, con
+   min-width:0 para que el flex-item pueda encoger) y app.js pone el texto COMPLETO
+   en `title` (RF-1601, Decisión 7). Intro/Espacio lo activan: es un <button> */
+.trigger-filtro {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px; /* objetivo táctil */
+  padding: 11px 16px;
   border: 1px solid var(--linea);
   border-radius: 999px;
   background: var(--superficie);
-  color: var(--tinta-media);
+  color: var(--tinta);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: left;
   cursor: pointer;
 }
 
-.filtro:hover {
+.trigger-filtro:hover {
   background: var(--linea-suave);
 }
 
-/* Cada pestaña toma el color de su material al activarse */
-.filtro.activo {
+/* Panel abierto: mismo tinte de la antigua pestaña activa (el estado del filtro
+   además va en el texto de la etiqueta, RF-1601) */
+.trigger-filtro[aria-expanded="true"] {
   background: var(--tinta);
   border-color: var(--tinta);
   color: #ffffff;
 }
 
-.filtro[data-filtro="Tela"].activo {
-  background: var(--tela);
-  border-color: var(--tela);
+.trigger-texto {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.filtro[data-filtro="Espuma"].activo {
-  background: var(--espuma);
-  border-color: var(--espuma);
-}
-
-.filtro[data-filtro="Estructuras"].activo {
-  background: var(--estructuras);
-  border-color: var(--estructuras);
-}
-
-.filtro[data-filtro="Otros"].activo {
-  background: var(--otros);
-  border-color: var(--otros);
-}
-
-/* ===== Filtro por provincia (spec 015, RF-1305) ===== */
-
-/* Desplegable junto a las pestañas de tipo: mismo aire que la fila de filtros
-   (tinta sobre el fondo de los botones, sin sombras, spec 003). El bloque
-   envuelve a 375 px (flex-wrap): etiqueta y control nunca desbordan */
-.filtro-provincia-bloque {
+/* Panel con casillas: se abre DEBAJO del trigger (absoluto: abrirlo no mueve la
+   lista ni la posición de scroll, RF-1606), borde de tinta sin sombras (retro,
+   spec 003), scroll INTERNO con muchas provincias (max-height + overflow-y) y
+   ancho limitado al propio desplegable/nunca a la ventana (375 px sin desbordes).
+   overflow-wrap evita que una provincia larga estire el panel */
+.panel-filtro {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
-  margin-bottom: 16px;
-}
-
-.filtro-provincia {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--tinta-media);
-}
-
-.filtro-provincia-select {
-  font: inherit;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--tinta);
+  width: 100%;
+  max-width: calc(100vw - 48px); /* jamás más ancho que la ventana */
+  max-height: min(60vh, 420px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 10px;
+  border: 1px solid var(--tinta);
+  border-radius: 8px;
   background: var(--superficie);
-  border: 1px solid var(--linea);
-  border-radius: 999px;
-  padding: 11px 16px; /* mínimo 44 px de alto para el pulgar */
-  min-height: 44px;
-  cursor: pointer;
-  max-width: 100%; /* nunca más ancho que su fila: sin desbordes a 375 px */
+  color: var(--tinta);
+  overflow-wrap: anywhere;
 }
 
-.filtro-provincia-select:hover {
-  background: var(--linea-suave);
+/* hidden gana a display:flex (patrón 016): fuera de pantalla y en la hoja el
+   panel no ocupa espacio ni se pinta */
+.panel-filtro[hidden] {
+  display: none;
 }
 
-.filtro-provincia-select:focus-visible {
-  outline: 2px solid var(--tinta);
-  outline-offset: 2px;
+/* Columna de casillas: una por opción, MISMO patrón visual .casilla del
+   formulario (caja 20 px en objetivo ≥44 px, foco visible en la casilla entera
+   vía :focus-within) */
+.panel-casillas {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.panel-filtro .casilla {
+  width: 100%; /* la fila entera es objetivo de clic */
+}
+
+/* Pie del panel: «Limpiar» a la derecha, separado por un filete suave */
+.panel-pie {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 8px;
+  border-top: 1px solid var(--linea-suave);
 }
 
 .contador {
@@ -506,7 +536,7 @@ h2 {
   line-height: 1;
 }
 
-/* Marcado: relleno en tinta, como la pestaña de filtro activa */
+/* Marcado: relleno en tinta, como el trigger de filtro con el panel abierto */
 .chip.marcado {
   background: var(--tinta);
   border-color: var(--tinta);

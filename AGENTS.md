@@ -60,9 +60,11 @@ funcionar sin servidor. La misma web se empaqueta como **aplicación de escritor
   conservan `id`, `fecha` y el filtro activo. El borrado pide confirmación dentro de la
   tarjeta («¿Seguro? · Sí, eliminar / No»), sin `confirm()` nativo. Avisos breves en un
   toast de 2,5 s.
-- **Filtros (Todos / Tela / Espuma / Estructuras / Otros)**: pestañas con `data-filtro` =
-  valor interno (`"Espuma"` para la pestaña Espuma), con filtrado **por pertenencia**
-  (spec 014): un cliente de varios tipos sale en la pestaña de cada uno de sus tipos.
+- ~~Filtros (Todos / Tela / Espuma / Estructuras / Otros)~~: **las pestañas
+  desaparecieron con la spec 018** (RF-1205/RF-104 derogados) y ahora son **dos
+  desplegables con casillas** (Tipo + Provincia) — ver «Filtros múltiples (spec
+  018)» abajo—. Sigue vigente el filtrado **por pertenencia** (spec 014): un cliente
+  de varios tipos cumple cada una de sus marcas de tipo.
 - **Buscador por texto (spec 005)**: campo «Buscar cliente» que filtra en vivo mientras
   se escribe, con todas las palabras («y») repartidas entre los campos, ignorando
   acentos y mayúsculas. Se combina con el filtro de tipo y sobrevive a cambios de
@@ -125,8 +127,10 @@ funcionar sin servidor. La misma web se empaqueta como **aplicación de escritor
   interfaz de chips que introdujo aquí **fue sustituida por la spec 016** —primero
   desplegable de selección única, hoy **casillas de selección múltiple**—; abajo solo
   queda lo que sigue vigente.)* Los filtros son
-  **por pertenencia**: un multi-tipo sale en cada pestaña de
-  sus tipos y en **«Otros»** si tiene tipos libres (los sin tipos solo en «Todos»). La
+  **por pertenencia**: un multi-tipo cumple **cada una** de las marcas de sus tipos y
+  **«Otros»** si tiene tipos libres (los sin tipos solo cumplen «Sin tipo») — *la frase
+  final del RF-1205 sobre «las pestañas» quedó **derogada por la 018**: ya no hay
+  pestañas, pero la pertenencia sigue intacta*—. La
   tarjeta pinta **un badge por tipo** con el **canto del primer tipo**; el listado y la
   impresión muestran la celda unida («Tela + Espuma»). Se guarda con `tipos` (array) +
   `tipo` = `tipos[0] ?? ""` (compatibilidad de lectura), con migración idempotente en las
@@ -138,11 +142,15 @@ funcionar sin servidor. La misma web se empaqueta como **aplicación de escritor
   libre** (se guarda lo escrito, recortado). La ficha muestra la línea **«Provincia»
   tras «Código postal»** (oculta si vacía); «Provincia» entra en el buscador y en el
   catálogo del listado (**12 campos**, entre CP y Tipo, «—» sin valor). **Filtro por
-  provincia** (desplegable «Todas las provincias» + una opción por provincia de los
-  clientes del **tipo activo**, variantes homófonas unificadas normalizando acentos y
-  mayúsculas, y vuelta a «Todas» si la selección desaparece) que se combina en **Y** con
+  provincia** — *(el desplegable **único** «Todas las provincias» y toda la mecánica de
+  mensajes del RF-1306 quedaron **derogados por la 018**: ahora es un desplegable con
+  **casillas** («o» dentro del grupo) con su casilla fija «Sin provincia»; las reglas de
+  **opciones** de esta entrada siguen intactas: una opción por provincia de los clientes
+  del **tipo activo**, variantes homófonas unificadas normalizando acentos y mayúsculas,
+  y vuelta automática a «sin filtro» si desaparecen)* — que se combina en **Y** con
   el filtro de tipo y la búsqueda; la cabecera de impresión gana la 3ª pieza
-  «Provincia: X». **Sin claves nuevas** de `localStorage` y **sin escritura de
+  «Provincia: X» *(la 018 la convierte en **lista**: «Provincia: Valencia,
+  Castellón»)*. **Sin claves nuevas** de `localStorage` y **sin escritura de
   migración** (los clientes antiguos sin `provincia` se leen como `""` y no se
   reescriben).
 - **Desplegable de tipo (spec 016)**: la interfaz del formulario de tipos vuelve al
@@ -197,6 +205,35 @@ funcionar sin servidor. La misma web se empaqueta como **aplicación de escritor
   abierta. `logica.js` solo añade **`nombreArchivoPdf(fecha)`** → **123 tests**. Sin
   claves nuevas de `localStorage` y JSON de clientes byte-idéntico al imprimir o
   guardar PDF.
+- **Filtros múltiples (spec 018)**: las pestañas de tipo y el `<select>` único de
+  provincia desaparecen (RF-1205/RF-1305/RF-1306 y RF-104 derogados) y pasan a ser
+  **dos desplegables con casillas** en `.barra-filtros` (antes del buscador): cada uno
+  es un **trigger** `<button>` (`#trigger-tipo` / `#trigger-provincia`, etiqueta viva
+  «Tipo: Tela, Espuma (2)» / «Provincia: Valencia (1)», `aria-expanded` + `aria-controls`)
+  y un **panel** oculto por defecto con casillas del mismo patrón del formulario y su
+  botón **«Limpiar»** (desmarca ese grupo **sin cerrar** el panel). Semántica: **«y»
+  (intersección) dentro del grupo tipo** —enmienda aprobada por el usuario el
+  2026-10-22: «Tela»+«Espuma» = **solo** los que son de las dos; **«Sin tipo» + cualquier
+  otra marca = imposible lógico → 0 resultados sin desmarcar nada** (los cinco marcados
+  ya **no** equivalen a «sin filtro»; eso solo lo es **cero marcas**)—, **«o» dentro del
+  grupo provincia** y **«y» entre tipo, provincia y búsqueda**. El panel de tipo tiene
+  las cinco casillas fijas (Tela, Espuma, Estructuras, Otros, Sin tipo); el de provincia
+  es **espejo de los datos** (provincias únicas normalizadas de los clientes del tipo
+  activo, «Gandía» y «CÁDIZ» incluidas) con la **casilla fija «Sin provincia»** (marca
+  `""`, SIEMPRE al final, **nunca se desmarca sola**); las opciones se **repueblan** al
+  cambiar el grupo tipo y las huérfanas **se desmarcan solas** (panel sin cerrarse).
+  Foco: Tab/Intro/Espacio operan el trigger, Escape y el clic fuera cierran
+  **devolviendo el foco al trigger** sin mover el scroll; **nunca dos paneles a la vez**.
+  Estados vacíos nuevos (`mensajeEstadoVacio` en `logica.js`): prioridad búsqueda →
+  filtros → lista vacía, con literales propios («…o desmarca alguna casilla.»,
+  «No hay clientes con estos filtros (Tipo: … · Provincia: …).…»). Cabecera de
+  impresión con **listas** (`textoContextoImpresion` con arrays; piezas Filtro ·
+  Provincia · Búsqueda). Lógica nueva en `logica.js`: `filtrarClientes(lista,
+  marcasTipos)` y `filtrarPorProvincia(lista, provincias)` con **firma de arrays**
+  (`[]` = sin filtro), `marcasProvinciaValidas` y `mensajeEstadoVacio` →
+  **166 tests**. **Sin claves nuevas** de `localStorage`: las marcas son estado de
+  sesión en memoria; alta e importación dejan **ambos grupos sin marcas** y la búsqueda
+  vacía. El modelo de datos (14 campos, `tipos`/`tipo`) **no cambia**.
 
 ## Forma de trabajar (SDD)
 

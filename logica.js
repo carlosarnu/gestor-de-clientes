@@ -134,26 +134,153 @@ function coincideProvincia(cliente, provincia) {
   return pedida !== "" && normalizar(provinciaCliente(cliente)) === pedida;
 }
 
-// Filtro por provincia en Y con el de tipo (RF-1305): «» (sin selección; el
-// <select> solo emite «» o nombres de provincia) → la lista tal cual; el resto,
-// solo los clientes cuya provincia coincida normalizada (los sin provincia solo
-// salen en «Todas las provincias»).
-function filtrarPorProvincia(lista, provincia) {
-  const pedida = texto(provincia);
-  if (pedida === "") return lista;
-  return lista.filter(function (c) { return coincideProvincia(c, pedida); });
+// =====================================================
+// Filtros múltiples por listas de marcas (spec 018)
+// =====================================================
+
+// Marca de la casilla FIJA «Sin provincia» del grupo provincia (spec 018,
+// Decisión D2 del plan): el string vacío. Es la única marca sin colisión
+// posible — provinciasExistentes nunca devuelve vacíos—, ni siquiera con una
+// provincia escrita literalmente «Sin provincia» (esa es una marca de texto
+// normal que pasa por su coincidencia de texto, RF-1603).
+const SIN_PROVINCIA = "";
+
+// Filtro por provincia en Y con el de tipo (RF-1603/RF-1604): `marcasProvincias`
+// es un ARRAY de marcas (antes un único string, spec 015): [] o entrada no-array
+// (defensivo) → la lista tal cual (sin filtro); con marcas, semántica «o» —
+// el cliente pasa si su provincia coincide normalizada con ALGUNA marca, o si su
+// provincia está vacía/ausente y entre las marcas está SIN_PROVINCIA (la fija).
+// Un cliente con la provincia escrita literalmente «Sin provincia» pasa por su
+// coincidencia de texto, NUNCA por la fija (su provincia no está vacía, colisión
+// decidida del RF-1603). No modifica la lista original.
+function filtrarPorProvincia(lista, marcasProvincias) {
+  if (!Array.isArray(marcasProvincias)) return lista.slice();
+  if (marcasProvincias.length === 0) return lista.slice();
+  return lista.filter(function (cliente) {
+    return marcasProvincias.some(function (marca) {
+      if (texto(marca) === SIN_PROVINCIA) return provinciaCliente(cliente) === "";
+      return coincideProvincia(cliente, marca);
+    });
+  });
 }
 
-// Selección válida del desplegable (RF-1305): `provincias` es el array de STRINGS
-// de salida de provinciasExistentes (no clientes). La selección se conserva si
-// sigue existiendo entre esas opciones (comparando forma normalizada); si no, o si
-// viene vacía → "" («Todas las provincias», nunca un filtro imposible).
+// Validación de las marcas de provincia contra las opciones del panel (RF-1605,
+// sustituye a provinciaValida, D3): `opciones` es el array de STRINGS de salida
+// de provinciasExistentes (sin vacíos) y `marcas` el array de marcas marcadas.
+// Devuelve solo las marcas que siguen existiendo entre las opciones, ALINEADAS a
+// la PRIMERA forma guardada (homófonos unificados: «malaga» → «MÁLAGA»), sin
+// duplicados y conservando el orden de las marcas. La fija SIN_PROVINCIA («»,
+// vacía también tras recortar) se conserva SIEMPRE (aunque no esté entre las
+// opciones ni quede ningún cliente sin provincia): es opción fija, análoga a
+// «Sin tipo», y nunca se desmarca sola por repueblado (RF-1605/Decisión 11).
+// Entradas no-array → []; nunca lanza.
+function marcasProvinciaValidas(opciones, marcas) {
+  const formas = new Map();
+  (Array.isArray(opciones) ? opciones : []).forEach(function (opcion) {
+    const forma = texto(opcion);
+    if (forma === "") return;
+    const clave = normalizar(forma);
+    if (!formas.has(clave)) formas.set(clave, forma);
+  });
+  if (!Array.isArray(marcas)) return [];
+  const validas = [];
+  let fijaConservada = false;
+  marcas.forEach(function (marca) {
+    const forma = texto(marca);
+    if (forma === SIN_PROVINCIA) {
+      if (!fijaConservada) {
+        validas.push(SIN_PROVINCIA);
+        fijaConservada = true;
+      }
+      return;
+    }
+    const alineada = formas.get(normalizar(forma));
+    if (alineada !== undefined && validas.indexOf(alineada) === -1) {
+      validas.push(alineada); // huérfana (no existe): desmarcada sola
+    }
+  });
+  return validas;
+}
+
+// Etiquetas de pintado de las marcas de provincia (RF-1603): la fija «» se
+// muestra como «Sin provincia» y el resto va tal cual (ya alineado por
+// marcasProvinciaValidas). Única fuente del literal, para que la etiqueta del
+// trigger, la cabecera de impresión y el estado vacío no diverjan (T-03/T-04).
+// Entrada no-array → []; nunca lanza.
+function nombreMarcasProvincias(marcas) {
+  if (!Array.isArray(marcas)) return [];
+  return marcas.map(function (marca) {
+    const forma = texto(marca);
+    return forma === SIN_PROVINCIA ? "Sin provincia" : forma;
+  });
+}
+
+// Literal del estado vacío de la lista (spec 018, RF-1607) en lógica pura, con
+// la prioridad búsqueda → filtros → lista realmente vacía y los TRES literales
+// exactos del RF-1607 (los viejos que nombraban «la pestaña «Todos»» y ««Todas
+// las provincias»» están derogados, RF-1306):
+//   1. Búsqueda activa → «No hay coincidencias para «X». Prueba con otras
+//      palabras» + « o desmarca alguna casilla.» SOLO si ALGÚN grupo tiene
+//      marcas; con los dos grupos sin marcas, la variante sin esa 2ª parte.
+//   2. Sin búsqueda y con casillas marcadas → «No hay clientes con estos filtros
+//      (Tipo: … · Provincia: …). Desmarca alguna casilla.» con SOLO las piezas
+//      activas (unidas por « · ») y las marcas de cada grupo unidas por «, »;
+//      la marca fija SIN_PROVINCIA («») CUENTA como provincia activa y se lee
+//      «Sin provincia» (nombreMarcasProvincias, única fuente del literal).
+//   3. Sin filtros ni búsqueda → «Aún no hay clientes. Rellena el formulario de
+//      arriba para añadir el primero.» (app.js añade sobre ESTE literal el
+//      mensaje de migración en 2 clics de la 011 cuando el escritorio arranca
+//      sin archivo inicial: la rama de migración la decide app.js).
+// `total` = clientes guardados: sin búsqueda ni marcas, 0 visibles ⟺ lista
+// «realmente vacía» (total 0); un total > 0 en esta rama sería un estado
+// imposible (sin criterios todos los clientes son visibles) y, como la spec solo
+// define estos tres literales, se devuelve el mismo de la rama 3.
+// `marcasTipos`/`marcasProvincias` son arrays de marcas; una entrada NO-array
+// (transición T-03→T-04, como textoContextoImpresion) cuenta como «sin marcas»
+// y nunca lanza. Texto plano SIN HTML: app.js lo pinta con textContent.
+function mensajeEstadoVacio(busqueda, marcasTipos, marcasProvincias, total) {
+  const busquedaLimpia = texto(busqueda);
+  const tipos = Array.isArray(marcasTipos)
+    ? marcasTipos.map(texto).filter(function (marca) { return marca !== ""; })
+    : [];
+  const provincias = Array.isArray(marcasProvincias) ? marcasProvincias : [];
+  const hayMarcas = tipos.length > 0 || provincias.length > 0;
+
+  // Rama 1: la búsqueda manda sobre todo lo demás (prioridad del RF-1607)
+  if (busquedaLimpia !== "") {
+    return hayMarcas
+      ? "No hay coincidencias para «" + busquedaLimpia +
+          "». Prueba con otras palabras o desmarca alguna casilla."
+      : "No hay coincidencias para «" + busquedaLimpia +
+          "». Prueba con otras palabras.";
+  }
+
+  // Rama 2: sin búsqueda pero con marcas → solo las piezas activas
+  if (hayMarcas) {
+    const piezas = [];
+    if (tipos.length > 0) piezas.push("Tipo: " + tipos.join(", "));
+    if (provincias.length > 0) {
+      piezas.push("Provincia: " + nombreMarcasProvincias(provincias).join(", "));
+    }
+    return "No hay clientes con estos filtros (" + piezas.join(" · ") +
+      "). Desmarca alguna casilla.";
+  }
+
+  // Rama 3: sin filtros ni búsqueda (ver comentario sobre `total` arriba)
+  return "Aún no hay clientes. Rellena el formulario de arriba para añadir el primero.";
+}
+
+// Compatibilidad de la 015 (decisión T-05, spec 018): firma única (un string)
+// delegando SIEMPRE en marcasProvinciaValidas (única ruta de validación, D3):
+// conserva la forma alineada si la provincia sigue entre las opciones y
+// devuelve «» si no (o si la selección viene vacía). app.js YA NO la usa desde
+// la 018 (su validación es la múltiple); se MANTIENE exportada por compatibilidad
+// con el filtro único de la 015 y sus tests (test-provincia.js), sin semántica
+// nueva. NO tocar sin revisar esos tests.
 function provinciaValida(provincias, seleccion) {
   const pedida = texto(seleccion);
-  if (pedida === "") return "";
-  const clave = normalizar(pedida);
-  return provincias.some(function (p) { return normalizar(p) === clave; })
-    ? pedida : "";
+  const validas = marcasProvinciaValidas(provincias, pedida === "" ? [] : [pedida]);
+  return validas.length === 0 ? "" : validas[0];
 }
 
 // Rellena los 14 campos de un cliente a partir del formulario: los 13 de siempre
@@ -345,24 +472,40 @@ function tiposDesdeCasillas(marcados, textoLibre) {
   return salida;
 }
 
-// Filtro de pestañas por PERTENENCIA (RF-1205): "Todos" → toda la lista; un tipo
-// concreto → los clientes que lo tengan entre sus tipos efectivos («Tela» incluye
-// a ["Tela","Espuma"]); "Otros" → quien tenga algún tipo no fijo (los fijos junto
-// a libres también entran, Decisión 7). Los «Sin tipos» solo en "Todos".
-// Funciona igual con datos viejos (solo `tipo`) gracias a tiposCliente.
-// No modifica la lista original.
-function filtrarClientes(lista, filtro) {
-  if (filtro === "Todos") return lista.slice();
-  if (filtro === "Otros") {
-    return lista.filter(function (cliente) {
-      return tiposCliente(cliente).some(function (tipo) {
-        return !esTipoFijo(tipo);
-      });
-    });
-  }
-  const buscado = texto(filtro);
+// Filtro por tipo con marcas MÚLTIPLES (RF-1602, RF-1604; sustituye al de
+// pestañas de la 014, que solo admitía una marca): `marcasTipos` es un ARRAY de
+// marcas —[] o entrada no-array (defensivo) → la lista completa, sin filtro— y
+// dentro del grupo la semántica es «y» (intersección, enmienda 2026-10-21: el
+// «filtro exacto» —Tela+Espuma = los que son de las DOS cosas—): el cliente pasa
+// solo si cumple TODAS las marcadas — un tipo fijo → pertenencia (tiposCliente:
+// «Tela» incluye a ["Tela","Espuma"] y al legado solo `tipo`); «Otros» → algún
+// tipo no fijo (los que llevan fijos junto a libres también entran, Decisión 7
+// de la 014); «Sin tipo» → tiposCliente vacío—. «Sin tipo» junto a cualquier
+// otra marca es un imposible lógico (exige tipos vacíos y algún tipo a la vez)
+// → lista vacía, sin desmarcado automático (RF-1602/RF-1605); por eso los cinco
+// marcados dan [] (ya NO es «sin filtro»: eso solo lo es cero marcas). Las marcas
+// desconocidas o vacías se ignoran sin lanzar (el panel solo ofrece las cinco
+// fijas). No modifica la lista original.
+function filtrarClientes(lista, marcasTipos) {
+  if (!Array.isArray(marcasTipos)) return lista.slice();
+  const marcas = marcasTipos.map(texto).filter(function (marca) {
+    return marca !== "";
+  });
+  if (marcas.length === 0) return lista.slice();
+  const fijasMarcadas = marcas.filter(esTipoFijo);
+  const quiereOtros = marcas.indexOf("Otros") !== -1;
+  const quiereSinTipo = marcas.indexOf("Sin tipo") !== -1;
+  // «Sin tipo» + cualquier otra marca = imposible lógico → sin resultados
+  if (quiereSinTipo && marcas.length > 1) return [];
   return lista.filter(function (cliente) {
-    return tiposCliente(cliente).indexOf(buscado) !== -1;
+    const tipos = tiposCliente(cliente);
+    if (quiereSinTipo) return tipos.length === 0;
+    const leFaltaAlgunFijo = fijasMarcadas.some(function (tipo) {
+      return tipos.indexOf(tipo) === -1;
+    });
+    if (leFaltaAlgunFijo) return false;
+    if (quiereOtros && !tipos.some(function (tipo) { return !esTipoFijo(tipo); })) return false;
+    return true;
   });
 }
 
@@ -692,24 +835,30 @@ function construirFilas(clientes, campos, hoy) {
 // Impresión del listado: cabecera de contexto (spec 013, RF-1104)
 // =====================================================
 
-// Texto de la cabecera impresa en papel: «Gestor de Clientes» + «Filtro: X» (solo
-// si el filtro no es «Todos» ni viene vacío; la etiqueta es la de la pestaña tal
-// cual, «Otros» literal) + «Provincia: X» (solo con provincia filtrada, spec 015,
-// RF-1308: tercer parámetro opcional; sin él el texto no cambia en un carácter) +
-// «Búsqueda: «texto»» (solo si tras recortar queda algo), unidas por « · » y con
-// las piezas vacías omitidas — Decisión 6 de la spec.
+// Texto de la cabecera impresa en papel (specs 013/015 → listas de la 018,
+// RF-1608): «Gestor de Clientes» + las piezas activas en el MISMO orden de
+// siempre — Filtro · Provincia · Búsqueda — unidas por « · » con las piezas
+// vacías omitidas (grupo sin marcas → sin pieza; sin búsqueda → sin pieza).
+// Cada grupo se une con «, »: los tipos tal cual (la marca «Todos» ya no
+// existe: el grupo vacío es «sin filtro» y no lleva pieza) y las provincias vía
+// nombreMarcasProvincias — única fuente del literal—, que imprime la marca fija
+// SIN_PROVINCIA («») como «Sin provincia» tal cual (RF-1603).
+// ENTRADA: arrays de marcas en los dos grupos (una sola semántica de entrada,
+// igual que D1 para el filtrado); una entrada NO-array (strings del app.js
+// viejo entre T-03 y T-04, null, undefined) cuenta como «sin marcas»: la pieza
+// se omite y NUNCA se lanza (envolverla crearía falsos positivos, p. ej. el «»
+// del select viejo leería «Provincia: Sin provincia»; app.js se arregla en
+// T-04/T-06).
 // Texto plano SIN HTML: la seguridad al pintarla la da textContent en app.js;
 // conserva acentos, mayúsculas y comillas tal cual las escribió el usuario.
-function textoContextoImpresion(filtro, busqueda, provincia) {
+function textoContextoImpresion(marcasTipos, busqueda, marcasProvincias) {
   const piezas = ["Gestor de Clientes"];
-  const filtroLimpio = texto(filtro);
-  if (filtroLimpio !== "" && filtroLimpio !== "Todos") {
-    piezas.push("Filtro: " + filtroLimpio);
-  }
-  const provinciaLimpia = texto(provincia);
-  if (provinciaLimpia !== "") {
-    piezas.push("Provincia: " + provinciaLimpia);
-  }
+  const tipos = Array.isArray(marcasTipos)
+    ? marcasTipos.map(texto).filter(function (marca) { return marca !== ""; })
+    : [];
+  if (tipos.length > 0) piezas.push("Filtro: " + tipos.join(", "));
+  const provincias = nombreMarcasProvincias(marcasProvincias);
+  if (provincias.length > 0) piezas.push("Provincia: " + provincias.join(", "));
   const busquedaLimpia = texto(busqueda);
   if (busquedaLimpia !== "") {
     piezas.push("Búsqueda: «" + busquedaLimpia + "»");
@@ -766,6 +915,12 @@ if (typeof module !== "undefined" && module.exports) {
     provinciasExistentes,
     coincideProvincia,
     filtrarPorProvincia,
+    SIN_PROVINCIA,
+    marcasProvinciaValidas,
+    nombreMarcasProvincias,
+    mensajeEstadoVacio,
+    // provinciaValida: compatibilidad de la 015 (delega en marcasProvinciaValidas;
+    // app.js ya no la usa desde la 018 — ver su comentario, decisión de T-05)
     provinciaValida
   };
 }

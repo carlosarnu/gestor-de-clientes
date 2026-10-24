@@ -23,7 +23,9 @@
    completo y tarjetas a una columna. */
 
 /* Chrome de la aplicación: cabecera decorativa con cinta, formulario completo,
-   título «Clientes» de la lista, pestañas de filtro, buscador, conmutador,
+   título «Clientes» de la lista, BARRA DE FILTROS ENTERA (los dos
+   desplegables: trigger, panel abierto y casillas — RF-1606: ni panel, ni trigger,
+   ni casilla viajan al papel/PDF), buscador, conmutador,
    contador «N clientes», botones («Imprimir», Exportar/Importar), confirmación
    en línea de la importación, selector de campos (chips y su título «Campos
    del listado»), acciones de tarjeta («Editar»/«Eliminar»), «¿Seguro? · Sí,
@@ -33,8 +35,8 @@
 .cabecera,
 .lista-cabecera h2,
 #panel-formulario,
-.filtros,
-.filtro-provincia-bloque,
+.barra-filtros,
+.panel-filtro,
 .buscador,
 .conmutador,
 .contador,

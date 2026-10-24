@@ -49,7 +49,9 @@ const {
   quitarTipoLibre,
   tiposDesdeCasillas,
   unirTiposTexto,
-  sanearListaClientes
+  sanearListaClientes,
+  SIN_PROVINCIA,
+  mensajeEstadoVacio
 } = require("./logica.js");
 
 // Ayuda: un formulario falso con la interfaz de FormData (.get)
@@ -195,30 +197,30 @@ test("ordenarClientes pone lo más reciente primero", () => {
   assert.deepEqual(ordenados.map(c => c.id), [1003, 1002, 1001]);
 });
 
-test("filtrarClientes 'Todos' devuelve todos sin tocar la lista original", () => {
+test("filtrarClientes con la lista de marcas vacía devuelve todos sin tocar la lista original (RF-1602)", () => {
   const copia = LISTA.slice();
-  assert.deepEqual(filtrarClientes(LISTA, "Todos"), LISTA);
+  assert.deepEqual(filtrarClientes(LISTA, []), LISTA);
   assert.deepEqual(LISTA, copia);
 });
 
-test("filtrarClientes por tipo solo deja ese tipo y no muta la lista (RF-010)", () => {
-  const tela = filtrarClientes(LISTA, "Tela");
+test("filtrarClientes por tipo solo deja ese tipo y no muta la lista (RF-1602)", () => {
+  const tela = filtrarClientes(LISTA, ["Tela"]);
   assert.equal(tela.length, 1);
   assert.equal(tela[0].empresa, "Textiles Norte");
   assert.equal(LISTA.length, 3);
-  assert.deepEqual(filtrarClientes(LISTA, "Estructuras").map(c => c.id), [1003]);
+  assert.deepEqual(filtrarClientes(LISTA, ["Estructuras"]).map(c => c.id), [1003]);
 });
 
-test("filtrarClientes 'Otros' deja lo no fijo con tipo y excluye vacíos y fijos (RF-603)", () => {
+test("filtrarClientes «Otros» deja lo no fijo con tipo y excluye vacíos y fijos (RF-603)", () => {
   const lista = LISTA.concat([
     { id: 1004, fecha: 1700000300000, empresa: "Toldos Sur", cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipo: "Toldos", notas: "" },
     { id: 1005, fecha: 1700000400000, empresa: "Sin Tipo SL", cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipo: "", notas: "" },
     { id: 1006, fecha: 1700000500000, empresa: "Genéricos", cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipo: "Otros", notas: "" }
   ]);
   const copia = lista.slice();
-  assert.deepEqual(filtrarClientes(lista, "Otros").map(c => c.id), [1004, 1006]); // libres y «Otros», nunca «Sin tipo»
-  assert.deepEqual(filtrarClientes(lista, "Tela").map(c => c.id), [1001]); // los fijos siguen en su pestaña
-  assert.deepEqual(filtrarClientes(lista, "Todos").length, 6);
+  assert.deepEqual(filtrarClientes(lista, ["Otros"]).map(c => c.id), [1004, 1006]); // libres y «Otros», nunca «Sin tipo»
+  assert.deepEqual(filtrarClientes(lista, ["Tela"]).map(c => c.id), [1001]); // los fijos siguen en su casilla
+  assert.deepEqual(filtrarClientes(lista, []).length, 6);
   assert.deepEqual(lista, copia); // no muta
 });
 
@@ -642,57 +644,57 @@ test("escaparAtributo sobre una celda real de construirCeldas deja el valor sin 
   assert.equal(pintado.indexOf('"'), -1); // el pintado en atributo, sí
 });
 
-// ===== Cabecera de impresión (spec 013, RF-1104) =====
+// ===== Cabecera de impresión (specs 013/015 → listas de la 018, RF-1104/RF-1608) =====
 
-test("textoContextoImpresion sin filtro ni búsqueda da solo el título (RF-1104)", () => {
-  assert.equal(textoContextoImpresion("Todos", ""), "Gestor de Clientes");
+test("textoContextoImpresion sin marcas ni búsqueda da solo el título (RF-1608)", () => {
+  assert.equal(textoContextoImpresion([], "", []), "Gestor de Clientes");
 });
 
-test("textoContextoImpresion con filtro «Tela» añade la pieza del filtro (RF-1104)", () => {
-  assert.equal(textoContextoImpresion("Tela", ""), "Gestor de Clientes · Filtro: Tela");
+test("textoContextoImpresion con una marca de tipo añade la pieza del filtro (RF-1608)", () => {
+  assert.equal(textoContextoImpresion(["Tela"], "", []), "Gestor de Clientes · Filtro: Tela");
 });
 
-test("textoContextoImpresion nunca muestra «Todos» (RF-1104)", () => {
+test("textoContextoImpresion con el grupo tipo vacío no muestra pieza Filtro (RF-1608)", () => {
   assert.equal(
-    textoContextoImpresion("Todos", "vega"),
+    textoContextoImpresion([], "vega", []),
     "Gestor de Clientes · Búsqueda: «vega»"
   );
 });
 
-test("textoContextoImpresion con filtro y búsqueda da el formato literal completo (RF-1104)", () => {
+test("textoContextoImpresion con filtro y búsqueda da el formato literal completo (RF-1608)", () => {
   assert.equal(
-    textoContextoImpresion("Tela", "vega"),
+    textoContextoImpresion(["Tela"], "vega", []),
     "Gestor de Clientes · Filtro: Tela · Búsqueda: «vega»"
   );
 });
 
-test("textoContextoImpresion con filtro «Otros» lo muestra literal (RF-1104)", () => {
-  assert.equal(textoContextoImpresion("Otros", ""), "Gestor de Clientes · Filtro: Otros");
+test("textoContextoImpresion con la marca «Otros» la muestra literal (RF-1608)", () => {
+  assert.equal(textoContextoImpresion(["Otros"], "", []), "Gestor de Clientes · Filtro: Otros");
 });
 
-test("textoContextoImpresion recorta la búsqueda y omite la de solo espacios (RF-1104)", () => {
+test("textoContextoImpresion recorta la búsqueda y omite la de solo espacios (RF-1608)", () => {
   assert.equal(
-    textoContextoImpresion("Todos", "  vega "),
+    textoContextoImpresion([], "  vega ", []),
     "Gestor de Clientes · Búsqueda: «vega»"
   );
   assert.equal(
-    textoContextoImpresion("Tela", "   "),
+    textoContextoImpresion(["Tela"], "   ", []),
     "Gestor de Clientes · Filtro: Tela"
   );
 });
 
-test("textoContextoImpresion con filtro vacío o ausente se comporta como «Todos» (RF-1104)", () => {
-  assert.equal(
-    textoContextoImpresion("", "vega"),
-    "Gestor de Clientes · Búsqueda: «vega»"
-  );
-  assert.equal(textoContextoImpresion(undefined, ""), "Gestor de Clientes");
-  assert.equal(textoContextoImpresion(null, null), "Gestor de Clientes");
+test("textoContextoImpresion con grupos no-array degrada a pieza ausente sin lanzar (RF-1608, transición T-03→T-04)", () => {
+  assert.equal(textoContextoImpresion(undefined, "vega", undefined), "Gestor de Clientes · Búsqueda: «vega»");
+  assert.equal(textoContextoImpresion(null, null, null), "Gestor de Clientes");
+  // strings del app.js viejo: se tratan como «sin marcas» (pieza ausente), nunca
+  // como una marca literal — envolverlos crearía un «Provincia: Sin provincia»
+  // falso con el «» del select viejo
+  assert.equal(textoContextoImpresion("Tela", "vega", "Málaga"), "Gestor de Clientes · Búsqueda: «vega»");
 });
 
-test("textoContextoImpresion conserva acentos, mayúsculas y comillas tal cual, sin marcado (RF-1104)", () => {
+test("textoContextoImpresion conserva acentos, mayúsculas y comillas tal cual, sin marcado (RF-1608)", () => {
   assert.equal(
-    textoContextoImpresion("Espuma", 'Müller & "Hnos" <x>'),
+    textoContextoImpresion(["Espuma"], 'Müller & "Hnos" <x>', []),
     'Gestor de Clientes · Filtro: Espuma · Búsqueda: «Müller & "Hnos" <x>»'
   );
 });
@@ -914,15 +916,159 @@ const LISTA_TIPOS = [
   { id: 24, fecha: 4, empresa: "Delta Estructuras", cif: "", contacto: "", telefono: "", movil: "", email: "", direccion: "", codigoPostal: "", tipo: "Estructuras", notas: "" } // legado sin tipos
 ];
 
-test("filtrarClientes por pertenencia: el cliente aparece en TODAS sus pestañas de tipo (RF-1205)", () => {
-  assert.deepEqual(filtrarClientes(LISTA_TIPOS, "Tela").map(c => c.id), [21, 22]);
-  assert.deepEqual(filtrarClientes(LISTA_TIPOS, "Espuma").map(c => c.id), [21]);
-  assert.deepEqual(filtrarClientes(LISTA_TIPOS, "Estructuras").map(c => c.id), [24]); // el legado filtra igual que antes
+test("filtrarClientes por pertenencia: el cliente aparece en TODAS las marcas de sus tipos (RF-1205, RF-1602)", () => {
+  assert.deepEqual(filtrarClientes(LISTA_TIPOS, ["Tela"]).map(c => c.id), [21, 22]);
+  assert.deepEqual(filtrarClientes(LISTA_TIPOS, ["Espuma"]).map(c => c.id), [21]);
+  assert.deepEqual(filtrarClientes(LISTA_TIPOS, ["Estructuras"]).map(c => c.id), [24]); // el legado filtra igual que antes
 });
 
-test("filtrarClientes «Otros» agrupa a quien tenga algún tipo no fijo; sin tipos solo en «Todos» (RF-1205)", () => {
-  assert.deepEqual(filtrarClientes(LISTA_TIPOS, "Otros").map(c => c.id), [22]); // «Tela + Toldos» también aparece en Tela
-  assert.deepEqual(filtrarClientes(LISTA_TIPOS, "Todos").map(c => c.id), [21, 22, 23, 24]);
+test("filtrarClientes «Otros» agrupa a quien tenga algún tipo no fijo; sin tipos solo con «Sin tipo» o sin filtro (RF-1205, RF-1602)", () => {
+  assert.deepEqual(filtrarClientes(LISTA_TIPOS, ["Otros"]).map(c => c.id), [22]); // «Tela + Toldos» también aparece en Tela
+  assert.deepEqual(filtrarClientes(LISTA_TIPOS, []).map(c => c.id), [21, 22, 23, 24]);
+});
+
+// --- filtros múltiples por lista de marcas de tipo (spec 018, RF-1602/RF-1604) ---
+
+test("filtrarClientes con lista vacía o entrada no-array es sin filtro: la lista completa (RF-1602)", () => {
+  assert.deepEqual(filtrarClientes(LISTA_TIPOS, []).map(c => c.id), [21, 22, 23, 24]);
+  // entrada no-array (defensivo, asunción del plan): sin filtro, nunca lanza
+  assert.deepEqual(filtrarClientes(LISTA_TIPOS, "Tela").map(c => c.id), [21, 22, 23, 24]);
+  assert.deepEqual(filtrarClientes(LISTA_TIPOS, undefined).map(c => c.id), [21, 22, 23, 24]);
+  assert.deepEqual(filtrarClientes(LISTA_TIPOS, null).map(c => c.id), [21, 22, 23, 24]);
+  assert.deepEqual(filtrarClientes([], []).map(c => c.id), []);
+});
+
+test("filtrarClientes con marcas de tipo usa semántica «y»: el cliente pasa solo si cumple TODAS marcadas (RF-1602)", () => {
+  // 21 = [Tela, Espuma], 22 = [Tela, Toldos], 24 = legado [Estructuras]
+  assert.deepEqual(filtrarClientes(LISTA_TIPOS, ["Tela", "Espuma"]).map(c => c.id), [21]); // intersección: solo el que tiene las dos
+  assert.deepEqual(filtrarClientes(LISTA_TIPOS, ["Espuma", "Estructuras"]).map(c => c.id), []); // nadie tiene ambas
+  // el multi-tipo pasa con TODOS los marcados, no con menos (RF-1610a)
+  assert.deepEqual(filtrarClientes(LISTA_TIPOS, ["Tela"]).map(c => c.id), [21, 22]);
+  assert.deepEqual(filtrarClientes(LISTA_TIPOS, ["Tela", "Otros"]).map(c => c.id), [22]); // exige el fijo Y además un tipo libre
+  // los cinco marcados: imposible lógico («Sin tipo» + tipos) → vacío, ya NO es «sin filtro»
+  assert.deepEqual(
+    filtrarClientes(LISTA_TIPOS, ["Tela", "Espuma", "Estructuras", "Otros", "Sin tipo"]).map(c => c.id),
+    []
+  );
+});
+
+test("filtrarClientes «Sin tipo» deja solo a quien no tenga tipos; «Otros» no excluye a quien lleve fijos (RF-1602)", () => {
+  assert.deepEqual(filtrarClientes(LISTA_TIPOS, ["Sin tipo"]).map(c => c.id), [23]);
+  // «Sin tipo» + «Otros» es imposible lógico → lista vacía (nada se desmarca solo)
+  assert.deepEqual(filtrarClientes(LISTA_TIPOS, ["Otros", "Sin tipo"]).map(c => c.id), []);
+  // el multi-tipo no es «Sin tipo»: sale por su fijo, nunca por la marca vacía
+  assert.equal(filtrarClientes(LISTA_TIPOS, ["Sin tipo"]).some(c => c.id === 21), false);
+});
+
+test("filtrarClientes con cliente de tres tipos: pasa con los marcados que cubra todos y no con menos (RF-1602, RF-1610a)", () => {
+  const lista = [{
+    id: 31, fecha: 1, empresa: "Triple", cif: "", contacto: "", telefono: "", movil: "",
+    email: "", direccion: "", codigoPostal: "", tipos: ["Tela", "Espuma", "Estructuras"],
+    tipo: "Tela", notas: ""
+  }];
+  assert.deepEqual(filtrarClientes(lista, ["Tela", "Espuma"]).map(c => c.id), [31]);
+  assert.deepEqual(filtrarClientes(lista, ["Tela", "Espuma", "Estructuras"]).map(c => c.id), [31]);
+  assert.deepEqual(filtrarClientes(lista, ["Tela", "Estructuras", "Otros"]).map(c => c.id), []); // no lleva tipo libre
+});
+
+test("filtrarClientes ignora las marcas desconocidas y los elementos no texto sin lanzar (defensivo RF-1602)", () => {
+  // «ignoradas» = sin efecto: con «y» no imponen restricción → lista completa
+  assert.deepEqual(filtrarClientes(LISTA_TIPOS, ["Madera"]).map(c => c.id), [21, 22, 23, 24]);
+  assert.deepEqual(filtrarClientes(LISTA_TIPOS, [null, "Tela"]).map(c => c.id), [21, 22]); // solo cuenta «Tela»
+});
+
+// --- estados vacíos de la lista (spec 018, RF-1607) ---
+
+test("mensajeEstadoVacio prioriza la búsqueda sobre los filtros y sobre la lista vacía (RF-1607)", () => {
+  // con búsqueda activa gana la rama 1, aunque haya marcas y aunque no haya clientes
+  assert.equal(
+    mensajeEstadoVacio("zzzz", ["Tela"], ["Valencia"], 0),
+    "No hay coincidencias para «zzzz». Prueba con otras palabras o desmarca alguna casilla."
+  );
+  assert.equal(
+    mensajeEstadoVacio("  zzzz  ", [], [], 5),
+    "No hay coincidencias para «zzzz». Prueba con otras palabras."
+  );
+});
+
+test("mensajeEstadoVacio rama 1: «o desmarca alguna casilla» solo si algún grupo tiene marcas (RF-1607)", () => {
+  assert.equal(
+    mensajeEstadoVacio("vega", ["Tela"], [], 3),
+    "No hay coincidencias para «vega». Prueba con otras palabras o desmarca alguna casilla."
+  );
+  // las marcas SOLO en provincia también activan la segunda parte
+  assert.equal(
+    mensajeEstadoVacio("vega", [], [SIN_PROVINCIA], 3),
+    "No hay coincidencias para «vega». Prueba con otras palabras o desmarca alguna casilla."
+  );
+  assert.equal(
+    mensajeEstadoVacio("vega", [], [], 3),
+    "No hay coincidencias para «vega». Prueba con otras palabras."
+  );
+});
+
+test("mensajeEstadoVacio rama 2: sin búsqueda y con marcas, solo las piezas activas unidas por « · » (RF-1607)", () => {
+  assert.equal(
+    mensajeEstadoVacio("", ["Estructuras"], [], 0),
+    "No hay clientes con estos filtros (Tipo: Estructuras). Desmarca alguna casilla."
+  );
+  assert.equal(
+    mensajeEstadoVacio("", [], ["Valencia"], 0),
+    "No hay clientes con estos filtros (Provincia: Valencia). Desmarca alguna casilla."
+  );
+  assert.equal(
+    mensajeEstadoVacio("", ["Tela", "Espuma"], ["Valencia", "Castellón"], 0),
+    "No hay clientes con estos filtros (Tipo: Tela, Espuma · Provincia: Valencia, Castellón). Desmarca alguna casilla."
+  );
+  // búsqueda de solo espacios = sin búsqueda → rama 2
+  assert.equal(
+    mensajeEstadoVacio("   ", ["Otros"], [], 1),
+    "No hay clientes con estos filtros (Tipo: Otros). Desmarca alguna casilla."
+  );
+});
+
+test("mensajeEstadoVacio rama 2 cuenta la marca fija SIN_PROVINCIA como provincia activa (RF-1607, RF-1603)", () => {
+  assert.equal(
+    mensajeEstadoVacio("", [], [SIN_PROVINCIA], 0),
+    "No hay clientes con estos filtros (Provincia: Sin provincia). Desmarca alguna casilla."
+  );
+  assert.equal(
+    mensajeEstadoVacio("", ["Sin tipo"], [SIN_PROVINCIA], 0),
+    "No hay clientes con estos filtros (Tipo: Sin tipo · Provincia: Sin provincia). Desmarca alguna casilla."
+  );
+});
+
+test("mensajeEstadoVacio rama 3: sin filtros ni búsqueda, el literal de la lista realmente vacía (RF-1607)", () => {
+  const literal = "Aún no hay clientes. Rellena el formulario de arriba para añadir el primero.";
+  assert.equal(mensajeEstadoVacio("", [], [], 0), literal);
+  // estado imposible (con clientes y sin criterios no puede haber 0 visibles):
+  // la spec solo define este literal para la rama 3, así que se devuelve igual
+  assert.equal(mensajeEstadoVacio("", [], [], 4), literal);
+});
+
+test("mensajeEstadoVacio no deriva a textos de pestañas retiradas y no lanza con entradas no-array (RF-1607, derogación RF-1306)", () => {
+  const literales = [
+    mensajeEstadoVacio("zzzz", [], [], 1),
+    mensajeEstadoVacio("", ["Tela"], [], 1),
+    mensajeEstadoVacio("", [], [], 0),
+    // strings del app.js viejo → tratados como «sin marcas», sin lanzar
+    mensajeEstadoVacio("zzzz", "Tela", "Valencia", 1)
+  ];
+  literales.forEach(function (literal) {
+    assert.equal(literal.indexOf("pestaña"), -1);
+    assert.equal(literal.indexOf("Todas las provincias"), -1);
+  });
+  assert.equal(
+    mensajeEstadoVacio("zzzz", "Tela", "Valencia", 1),
+    "No hay coincidencias para «zzzz». Prueba con otras palabras."
+  );
+});
+
+test("mensajeEstadoVacio conserva acentos, mayúsculas y comillas de la búsqueda tal cual, sin marcado (RF-1607)", () => {
+  assert.equal(
+    mensajeEstadoVacio('  Müller "Hnos"  ', [], [], 2),
+    'No hay coincidencias para «Müller "Hnos"». Prueba con otras palabras.'
+  );
 });
 
 // --- búsqueda en todos los tipos (RF-1206) ---

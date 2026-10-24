@@ -15,10 +15,17 @@ const EN_ESCRITORIO = typeof window.gestorDatos !== "undefined";
 const formulario = document.getElementById("formulario-cliente");
 const listaClientes = document.getElementById("lista-clientes");
 const contador = document.getElementById("contador");
-const contenedorFiltros = document.getElementById("filtros");
-// Desplegable del filtro por provincia (spec 015, RF-1305): se repuebla en cada
-// pintarFiltroProvincia() con las provincias del filtro de tipo activo
-const campoFiltroProvincia = document.getElementById("filtro-provincia");
+// Barra de filtros (spec 018, RF-1601): los DOS desplegables con casillas que
+// sustituyen a las pestañas (`contenedorFiltros`, botones data-filtro) y al
+// <select> único de provincia de la 015 (`campoFiltroProvincia`). Cada
+// desplegable: trigger con etiqueta dinámica + panel (hidden por defecto) con
+// casillas; el de provincia lo rellena app.js en memoria con el espejo de los
+// datos y la casilla FIJA «Sin provincia» al final (RF-1603)
+const triggerTipo = document.getElementById("trigger-tipo");
+const panelTipo = document.getElementById("panel-tipo");
+const triggerProvincia = document.getElementById("trigger-provincia");
+const panelProvincias = document.getElementById("panel-provincias");
+const casillasProvincias = document.getElementById("casillas-provincias");
 const tituloFormulario = document.getElementById("titulo-formulario");
 const botonGuardar = document.getElementById("boton-guardar");
 const botonCancelar = document.getElementById("boton-cancelar");
@@ -65,12 +72,17 @@ const contenedorChips = document.getElementById("chips");
 // ANTES de cargarClientes() porque esa función lo rellena al arrancar.
 let archivoInicialExiste = false;
 let clientes = cargarClientes();
-let filtroActivo = "Todos";
-// Filtro por provincia (spec 015, RF-1305): SOLO en memoria, sin ninguna clave
-// nueva (igual que el filtro de tipo y la vista). Se limpia en el alta (coherencia
-// con la 010) y se repuebla/valida en pintarFiltroProvincia() antes de cada
-// pintarLista() que pueda cambiar datos o pestaña. NO redeclarar.
-let filtroProvincia = "";
+// Filtros múltiples (spec 018, RF-1601/1602/1603): SOLO en memoria, sin ninguna
+// clave nueva (igual que siempre: RF-1609). Sustituyen a `filtroActivo` (pestañas)
+// y a `filtroProvincia` (select único de la 015). [] = sin filtro de ese grupo;
+// las marcas del grupo provincia usan "" (SIN_PROVINCIA) para la casilla fija
+// «Sin provincia». NO redeclarar. Se repintan/validan en repintarFiltros() antes
+// de cada pintarLista() que pueda cambiar datos o marcas de tipo (RF-1605).
+let marcasTipos = [];
+let marcasProvincias = [];
+// Panel de filtro abierto ahora mismo: "tipo" | "provincia" | null (RF-1606:
+// nunca dos a la vez; el estado vive solo en memoria como todo el resto)
+let panelAbierto = null;
 let textoBusqueda = ""; // texto del buscador (spec 005)
 // Vista actual y campos elegidos del listado (spec 012): SOLO en memoria, sin
 // persistencia — al recargar se vuelve a «Tarjetas» con solo «Empresa» (RF-1006)
@@ -251,87 +263,241 @@ formulario.addEventListener("submit", function (evento) {
   }
 
   // Alta con feedback (spec 010, RF-801): buscador limpio y aviso «Cliente guardado».
-  // La limpieza va antes de pintarFiltros/pintarLista para que la lista se pinte sin filtro de texto
+  // La limpieza va antes de repintarFiltros/pintarLista para que la lista se pinte sin filtro de texto
   textoBusqueda = "";
   campoBuscador.value = "";
-  // Coherencia con la 010 y la 015 (caso límite «Alta con filtro de provincia
-  // activo»): el alta vuelve a «Todos» y además desactiva el filtro de provincia
-  // para no dejar un filtro imposible; pintarFiltroProvincia() repuebla el
-  // <select> con las provincias de la lista ya con el cliente nuevo.
-  filtroProvincia = "";
+  // Estado limpio tras el alta (spec 018, RF-1609 — el equivalente de siempre:
+  // antes era volver a la pestaña «Todos» + «Todas las provincias»): ambos
+  // grupos de filtro SIN marcas para no dejar un filtro imposible con el cliente
+  // recién creado; repintarFiltros() repuebla las provincias con la lista ya
+  // actualizada y refresca las etiquetas (RF-1605/RF-1601)
+  marcasTipos = [];
+  marcasProvincias = [];
+  // Panel abierto (p. ej. quedado abierto navegando por teclado): se cierra
+  // sin devolver foco, para que el estado tras el alta sea limpio por completo
+  cerrarPanel(false);
   pintarAviso(mensajeAviso("guardado"));
 
-  // Limpiamos el formulario y volvemos a la pestaña "Todos"
+  // Limpiamos el formulario y los dos grupos de filtro
   resetearFormulario();
-  filtroActivo = "Todos";
-  pintarFiltros();
-  pintarFiltroProvincia(); // siempre ANTES de pintarLista (RF-1305)
+  repintarFiltros(); // paneles + etiquetas, siempre ANTES de pintarLista
   pintarLista();
 });
 
 // =====================================================
-// Filtros
+// Filtros múltiples: dos desplegables con casillas (spec 018)
 // =====================================================
 
-contenedorFiltros.addEventListener("click", function (evento) {
-  const boton = evento.target.closest(".filtro");
-  if (!boton) return;
+// Los dos desplegables de la barra, por su clave de grupo
+const DESPLEGABLES_FILTRO = {
+  tipo: { trigger: triggerTipo, panel: panelTipo },
+  provincia: { trigger: triggerProvincia, panel: panelProvincias }
+};
 
-  filtroActivo = boton.dataset.filtro;
-  pintarFiltros();
-  // Las provincias dependen del tipo activo: se repuebla ANTES de pintar la
-  // lista; si la selección ya no existe entre las nuevas opciones, la lógica la
-  // devuelve «» y el desplegable vuelve a «Todas las provincias» (RF-1305)
-  pintarFiltroProvincia();
-  pintarLista();
+// --- Apertura y cierre (RF-1606) ---
+
+// Clic en un trigger: alterna SU panel; al abrir, el otro se cierra (nunca dos
+// paneles a la vez). Intro y Espacio llegan como clic (es un <button>)
+triggerTipo.addEventListener("click", function () {
+  alternarPanel("tipo");
 });
 
-function pintarFiltros() {
-  const botones = contenedorFiltros.querySelectorAll(".filtro");
-  botones.forEach(function (boton) {
-    boton.classList.toggle("activo", boton.dataset.filtro === filtroActivo);
-  });
-}
+triggerProvincia.addEventListener("click", function () {
+  alternarPanel("provincia");
+});
 
-// Desplegable de provincia (spec 015, RF-1305/RF-1306): una opción por provincia
-// de los clientes que pasan el filtro de TIPO activo (sin tener en cuenta la
-// búsqueda); de ahí salen también el valor validado de la selección y, más abajo,
-// los visibles. Las provincias únicas, su orden y la validación son de la lógica
-// pura (provinciasExistentes / provinciaValida): aquí solo se reconstruye el
-// <select> — opción «Todas las provincias» (value="") + una por provincia con su
-// texto tal cual se guardó (el value es ese mismo texto; la comparación
-// normalizada la hace la lógica al filtrar). Si la selección ya no existe entre
-// las opciones, provinciaValida() la devuelve «»: nunca un filtro imposible.
-function pintarFiltroProvincia() {
-  const provincias = provinciasExistentes(filtrarClientes(clientes, filtroActivo));
-  filtroProvincia = provinciaValida(provincias, filtroProvincia);
-
-  const opciones = ['<option value="">Todas las provincias</option>'];
-  provincias.forEach(function (provincia) {
-    opciones.push('<option value="' + escaparAtributo(provincia) + '">' + escapar(provincia) + "</option>");
-  });
-  campoFiltroProvincia.innerHTML = opciones.join("");
-
-  // La selección puede estar escrita con otra forma que la opción equivalente
-  // (p. ej. «Cádiz» elegida en «Todos» cuando en «Espuma» solo hay «CÁDIZ»): el
-  // <select> solo admite valores que existan como opción, así que alineamos el
-  // estado a la forma que se muestra. El filtrado no cambia (normaliza), solo el
-  // texto visible.
-  if (filtroProvincia !== "") {
-    const forma = provincias.find(function (provincia) {
-      return normalizar(provincia) === normalizar(filtroProvincia);
-    });
-    filtroProvincia = forma || "";
+function alternarPanel(grupo) {
+  if (panelAbierto === grupo) {
+    cerrarPanel(true); // segundo clic en el trigger: cierra y remata el foco
+    return;
   }
-  campoFiltroProvincia.value = filtroProvincia;
+  abrirPanel(grupo);
 }
 
-// Cambio del desplegable: la opción elegida pasa al estado en memoria (sin ninguna
-// clave nueva) y se repinta la lista. Las opciones solo dependen del filtro de tipo,
-// que aquí no cambia, así que no hace falta repintar el <select> (RF-1305)
-campoFiltroProvincia.addEventListener("change", function () {
-  filtroProvincia = campoFiltroProvincia.value;
+function abrirPanel(grupo) {
+  if (panelAbierto !== null) cambiarVisibilidadPanel(panelAbierto, false, false);
+  panelAbierto = grupo;
+  cambiarVisibilidadPanel(grupo, true, false);
+}
+
+// Cierra el panel abierto (si lo hay). `devolverFoco` (RF-1606): el foco vuelve
+// a su trigger con preventScroll — ni foco perdido ni scroll de la página movido
+function cerrarPanel(devolverFoco) {
+  if (panelAbierto === null) return;
+  cambiarVisibilidadPanel(panelAbierto, false, devolverFoco);
+  panelAbierto = null;
+}
+
+function cambiarVisibilidadPanel(grupo, visible, devolverFoco) {
+  const partes = DESPLEGABLES_FILTRO[grupo];
+  partes.panel.hidden = !visible;
+  partes.trigger.setAttribute("aria-expanded", visible ? "true" : "false");
+  if (!visible && devolverFoco) {
+    partes.trigger.focus({ preventScroll: true });
+  }
+}
+
+// Clic FUERA de cualquier desplegable → cierra el panel abierto (RF-1606). El
+// foco solo vuelve al trigger si seguía dentro del panel: si el clic fue en otro
+// control enfocable manda el navegador (no se roba el foco a lo pulsado) y, si
+// el clic fue en zona muda, el panel no deja el foco perdido en <body>
+document.addEventListener("click", function (evento) {
+  if (panelAbierto === null) return;
+  if (!evento.target || typeof evento.target.closest !== "function") return;
+  if (evento.target.closest(".desplegable-filtro")) return;
+  const partes = DESPLEGABLES_FILTRO[panelAbierto];
+  cerrarPanel(partes.panel.contains(document.activeElement));
+});
+
+// =====================================================
+// Paneles: casillas, marcas y etiquetas de estado
+// =====================================================
+
+// Casillas marcadas de un panel, en el orden en que se ven (incluida la casilla
+// fija «Sin provincia», cuyo value vacío es SIN_PROVINCIA)
+function casillasMarcadas(contenedor) {
+  const marcas = [];
+  contenedor.querySelectorAll('input[type="checkbox"]').forEach(function (casilla) {
+    if (casilla.checked) marcas.push(casilla.value);
+  });
+  return marcas;
+}
+
+// Sincroniza el `checked` de las casillas de un panel con su array de marcas
+// (comparación exacta: pintarPanelProvincia alinea las marcas a la forma mostrada)
+function sincronizarCasillas(contenedor, marcas) {
+  contenedor.querySelectorAll('input[type="checkbox"]').forEach(function (casilla) {
+    casilla.checked = marcas.indexOf(casilla.value) !== -1;
+  });
+}
+
+// Panel TIPO: las cinco casillas son estáticas en el HTML (RF-1602), aquí solo
+// se sincroniza su estado con marcasTipos
+function pintarPanelTipo() {
+  sincronizarCasillas(panelTipo, marcasTipos);
+}
+
+// Último conjunto de provincias pintado (separador de líneas: un \n no puede
+// aparecer en un valor de un <input type="text">). Sirve para reconstruir el
+// HTML del panel SOLO cuando cambian las opciones y, si no, tocar únicamente
+// los `checked` (el foco de una casilla marcada no se pierde, RF-1606)
+let opcionesProvinciasPintadas = null;
+
+// Panel PROVINCIA (RF-1603): espejo de los datos — una casilla por provincia de
+// los clientes que pasan el grupo TIPO marcado (sin contar la búsqueda; grupo
+// tipo vacío → provincias de todos), únicas por normalizar en orden alfabético
+// «es»: eso ya lo garantiza provinciasExistentes(). RF-1605: las marcas que dejan
+// de existir entre las opciones se desmarcan SOLAS con marcasProvinciaValidas y
+// su forma visible se alinea a la primera guardada; la marca fija "" («Sin
+// provincia») nunca se va. La casilla fija vive en el HTML, FUERA de
+// #casillas-provincias: el repueblado jamás la reconstruye ni la desmarca.
+function pintarPanelProvincia() {
+  const opciones = provinciasExistentes(filtrarClientes(clientes, marcasTipos));
+  marcasProvincias = marcasProvinciaValidas(opciones, marcasProvincias);
+
+  const clave = opciones.join("\n");
+  if (clave !== opcionesProvinciasPintadas) {
+    const focoPrevia = casillaFocoDentro(casillasProvincias);
+    casillasProvincias.innerHTML = opciones.map(function (provincia, indice) {
+      const id = "filtro-provincia-" + indice;
+      return '<label class="casilla" for="' + id + '">' +
+        '<input type="checkbox" id="' + id + '" value="' + escaparAtributo(provincia) + '">' +
+        "<span>" + escapar(provincia) + "</span>" +
+        "</label>";
+    }).join("");
+    opcionesProvinciasPintadas = clave;
+    restaurarFocoCasilla(casillasProvincias, focoPrevia);
+  }
+
+  sincronizarCasillas(panelProvincias, marcasProvincias);
+}
+
+// Si el foco estaba en una casilla del contenedor, su valor (para restaurarlo
+// tras reconstruir el panel); null si el foco no estaba ahí
+function casillaFocoDentro(contenedor) {
+  const activo = document.activeElement;
+  if (activo && activo.type === "checkbox" && contenedor.contains(activo)) {
+    return activo.value;
+  }
+  return null;
+}
+
+function restaurarFocoCasilla(contenedor, valor) {
+  if (valor === null) return;
+  const casillas = contenedor.querySelectorAll('input[type="checkbox"]');
+  for (let indice = 0; indice < casillas.length; indice++) {
+    if (casillas[indice].value === valor) {
+      casillas[indice].focus({ preventScroll: true });
+      return;
+    }
+  }
+}
+
+// Etiqueta de cada trigger (RF-1601 y Decisión 7): cero marcas → «Tipo: Todos» /
+// «Provincia: Todas»; con marcas → el listado y su recuento SOLO si las hay
+// («Tipo: Tela, Espuma (2)»). Las provincias salen por nombreMarcasProvincias
+// (única fuente del literal: «» → «Sin provincia»). El corte con «…» lo hace el
+// CSS (.trigger-texto) cuando no cabe y el texto COMPLETO va siempre en `title`
+function actualizarEtiquetas() {
+  pintarEtiqueta(triggerTipo, marcasTipos.length === 0
+    ? "Tipo: Todos"
+    : "Tipo: " + marcasTipos.join(", ") + " (" + marcasTipos.length + ")");
+  pintarEtiqueta(triggerProvincia, marcasProvincias.length === 0
+    ? "Provincia: Todas"
+    : "Provincia: " + nombreMarcasProvincias(marcasProvincias).join(", ") +
+        " (" + marcasProvincias.length + ")");
+}
+
+function pintarEtiqueta(trigger, etiqueta) {
+  trigger.querySelector(".trigger-texto").textContent = etiqueta;
+  trigger.title = etiqueta;
+}
+
+// Repinta los dos paneles y sus etiquetas (al arrancar y tras cambios de datos:
+// alta, edición, borrado e importación)
+function repintarFiltros() {
+  pintarPanelTipo();
+  pintarPanelProvincia();
+  actualizarEtiquetas();
+}
+
+// --- Marcar / desmarcar (RF-1602/1603/1604): repinta AL INSTANTE, sin botón
+// «Aplicar», sin recargar y SIN cerrar el panel ---
+
+// Grupo TIPO: sus marcas cambian las opciones de provincia, así que el panel de
+// provincia se repuebla y valida (RF-1605) ANTES de repintar la lista
+panelTipo.addEventListener("change", function (evento) {
+  if (!evento.target || evento.target.type !== "checkbox") return;
+  marcasTipos = casillasMarcadas(panelTipo);
+  pintarPanelProvincia();
+  actualizarEtiquetas();
   pintarLista();
+});
+
+// Grupo PROVINCIA: sus marcas no cambian las opciones (dependen solo del tipo),
+// con lo que basta etiqueta + lista
+panelProvincias.addEventListener("change", function (evento) {
+  if (!evento.target || evento.target.type !== "checkbox") return;
+  marcasProvincias = casillasMarcadas(panelProvincias);
+  actualizarEtiquetas();
+  pintarLista();
+});
+
+// «Limpiar» de cada panel (RF-1601/RF-1606): ese grupo queda SIN marcas —el
+// equivalente a «sin filtro»— y el panel NO se cierra
+document.querySelectorAll("[data-limpiar]").forEach(function (boton) {
+  boton.addEventListener("click", function () {
+    if (boton.dataset.limpiar === "tipo") {
+      marcasTipos = [];
+      pintarPanelTipo();
+      pintarPanelProvincia(); // al quitar tipos, cambian las provincias ofrecidas
+    } else {
+      marcasProvincias = [];
+      sincronizarCasillas(panelProvincias, marcasProvincias);
+    }
+    actualizarEtiquetas();
+    pintarLista();
+  });
 });
 
 // =====================================================
@@ -494,8 +660,9 @@ function guardarEdicion(datos) {
   clienteEditandoId = null;
   resetearFormulario();
   pintarFormularioModo();
-  // La edición puede cambiar o quitar la provincia del filtro activo (RF-1305)
-  pintarFiltroProvincia();
+  // La edición puede cambiar las provincias ofrecidas o dejar huérfana una marca
+  // (RF-1605): se repuebla/valida el panel, se refrescan etiquetas y lista
+  repintarFiltros();
   pintarLista();
   pintarAviso(guardado ? mensajeAviso("actualizado") : "No se pudo guardar los datos");
 }
@@ -526,9 +693,10 @@ function eliminarCliente(id) {
   } catch (error) {
     guardado = false;
   }
-  // Si se borró el último cliente de la provincia filtrada, se repuebla y el
-  // filtro vuelve solo a «Todas las provincias» (RF-1305, caso límite)
-  pintarFiltroProvincia();
+  // Si se borró el último cliente de una provincia marcada, esa opción
+  // desaparece del repueblado y su casilla se desmarca sola (RF-1605, caso
+  // límite); la fija «Sin provincia» nunca se desmarca por repueblado
+  repintarFiltros();
   pintarLista();
   pintarAviso(guardado ? mensajeAviso("eliminado") : "No se pudo guardar los datos");
 }
@@ -666,10 +834,17 @@ botonReemplazar.addEventListener("click", function () {
     guardado = false;
   }
 
-  // Estado limpio (RF-901): pestaña «Todos» y buscador vacío, campo e interno
-  filtroActivo = "Todos";
+  // Estado limpio (RF-901 → spec 018, RF-1609): ambos grupos SIN marcas y
+  // buscador vacío. NOTA DE CAMBIO de la 018: antes la importación solo
+  // revalidaba la provincia y una marca que siguiera existiendo sobrevivía;
+  // ahora importar deja los dos grupos limpios, igual que el alta
+  marcasTipos = [];
+  marcasProvincias = [];
   textoBusqueda = "";
   campoBuscador.value = "";
+  // Panel abierto (p. ej. quedado abierto navegando por teclado): se cierra
+  // sin devolver foco, para que el estado tras importar sea limpio por completo
+  cerrarPanel(false);
 
   // Y sin ediciones ni borrados en curso apuntando a clientes que ya no existen
   confirmandoEliminarId = null;
@@ -679,10 +854,7 @@ botonReemplazar.addEventListener("click", function () {
     pintarFormularioModo();
   }
 
-  pintarFiltros();
-  // Misma regla que en la 015: si la provincia activa no está en la lista nueva,
-  // el desplegable se repuebla y vuelve a «Todas las provincias» (RF-1305)
-  pintarFiltroProvincia();
+  repintarFiltros(); // paneles con las provincias de la lista nueva + etiquetas
   ocultarConfirmacionImportacion();
   pintarLista();
   pintarAviso(guardado ? "Clientes importados" : "No se pudo guardar los datos");
@@ -698,16 +870,17 @@ botonCancelarImportacion.addEventListener("click", function () {
 // Vista previa de impresión (spec 017, RF-1501…RF-1505)
 // =====================================================
 
-// Cabecera de contexto de la hoja (spec 013, RF-1103 → spec 017, RF-1503): una
-// ÚNICA helper para las dos rutas que la necesitan — el listener «beforeprint»
-// (Ctrl+P / menú del navegador, RF-1509, y también toda impresión lanzada desde la
-// vista previa) y la apertura de la vista previa, para que la cabecera ya esté
-// fresca al mostrarse sin depender de un evento que Electron no garantiza con
-// printToPDF (plan §3.4). Tercer argumento (spec 015, RF-1308): el filtro de
-// provincia vigente; sin provincia activa textoContextoImpresion omite la pieza.
+// Cabecera de contexto de la hoja (spec 013, RF-1103 → spec 017, RF-1503 → spec
+// 018, RF-1608): una ÚNICA helper para las dos rutas que la necesitan — el
+// listener «beforeprint» (Ctrl+P / menú del navegador, RF-1509, y también toda
+// impresión lanzada desde la vista previa) y la apertura de la vista previa, para
+// que la cabecera ya esté fresca al mostrarse sin depender de un evento que
+// Electron no garantiza con printToPDF (plan §3.4). Grupos en ARRAYS (spec 018,
+// T-03/T-04): textoContextoImpresion une cada grupo con «, » y omite las piezas
+// vacías, en el orden de siempre Filtro · Provincia · Búsqueda (RF-1608).
 // textContent pinta seguro, sin innerHTML.
 function refrescarCabeceraImpresion() {
-  cabeceraImpresion.textContent = textoContextoImpresion(filtroActivo, textoBusqueda, filtroProvincia);
+  cabeceraImpresion.textContent = textoContextoImpresion(marcasTipos, textoBusqueda, marcasProvincias);
 }
 
 window.addEventListener("beforeprint", refrescarCabeceraImpresion);
@@ -767,13 +940,22 @@ function cerrarVistaPrevia() {
   botonImprimir.focus({ preventScroll: true });
 }
 
-// Escape cierra la vista previa (RF-1504). Listener ÚNICO y permanente que solo
-// reacciona a Escape y solo con la vista previa abierta: no se intercepta ninguna
-// otra tecla ni Ctrl+P (Decisión 4 de la spec; la 013 queda intacta). El cuadro
-// nativo de impresión consume su propio Escape sin que llegue a la página, así que
-// cancelarlo NO cierra la vista previa (RF-1505, caso límite de la spec).
+// Escape, con la jerarquía de la spec 018 sobre la 017 (RF-1606 + Decisión 4 de
+// la 017): listener ÚNICO y permanente que solo reacciona a Escape. PRIMERO los
+// paneles de filtro — si hay alguno abierto, Escape cierra SOLO ese panel (con
+// foco de vuelta a su trigger y sin mover el scroll) y la vista previa —si lo
+// estuviera— queda abierta para el siguiente Escape; SIN panel abierto manda la
+// vista previa de la 017, exactamente como hasta ahora. No se intercepta ninguna
+// otra tecla ni Ctrl+P. El cuadro nativo de impresión consume su propio Escape
+// sin que llegue a la página, así que cancelarlo NO cierra la vista previa
+// (RF-1505, caso límite de la spec).
 window.addEventListener("keydown", function (evento) {
-  if (evento.key !== "Escape" || !vistaPreviaAbierta) return;
+  if (evento.key !== "Escape") return;
+  if (panelAbierto !== null) {
+    cerrarPanel(true);
+    return;
+  }
+  if (!vistaPreviaAbierta) return;
   cerrarVistaPrevia();
 });
 
@@ -842,14 +1024,16 @@ botonVpCerrar.addEventListener("click", cerrarVistaPrevia);
 // Lista de clientes
 // =====================================================
 
-// Clientes visibles en la lista AHORA: orden (más reciente primero) + filtro de
-// tipo + filtro de PROVINCIA + búsqueda de texto (combinación en Y, RF-1305), con
-// la lógica pura de logica.js. Compartida entre el pintado y el guardia de
-// «Imprimir» (plan §5): un solo cálculo, imposible que el guardia y lo que se
-// pinten divergan; el contador sale de aquí, así que refleja los tres a la vez.
+// Clientes visibles en la lista AHORA: orden (más reciente primero) + grupo
+// TIPO («o» entre marcas; vacío = sin filtro) + grupo PROVINCIA («o» entre
+// marcas; vacío = sin filtro, «» = sin provincia) + búsqueda de texto, todo en
+// Y entre los tres criterios (spec 018, RF-1604), con la lógica pura de
+// logica.js. Compartida entre el pintado y el guardia de «Imprimir» (plan §5):
+// un solo cálculo, imposible que el guardia y lo que se pinten divergan; el
+// contador sale de aquí, así que refleja los tres a la vez.
 function visiblesActuales() {
-  const porTipo = filtrarClientes(ordenarClientes(clientes), filtroActivo);
-  const porProvincia = filtrarPorProvincia(porTipo, filtroProvincia);
+  const porTipo = filtrarClientes(ordenarClientes(clientes), marcasTipos);
+  const porProvincia = filtrarPorProvincia(porTipo, marcasProvincias);
   return buscarClientes(porProvincia, textoBusqueda);
 }
 
@@ -857,32 +1041,36 @@ function pintarLista() {
   // Mismos visibles de siempre (filtro + búsqueda + orden, lógica en logica.js)
   const visibles = visiblesActuales();
 
-  // Contador de clientes (refleja tipo + provincia + búsqueda, RF-1306)
+  // Contador de clientes (refleja tipo + provincia + búsqueda, los tres en Y,
+  // RF-1604; la pieza de mensajes la define el RF-1607)
   contador.textContent = textoContador(visibles.length);
 
-  // Lista vacía: mensaje según toque (prioridad búsqueda → provincia → tipo → vacío)
+  // Lista vacía: el literal lo decide la lógica pura mensajeEstadoVacio()
+  // (spec 018, RF-1607): prioridad búsqueda → filtros → lista realmente vacía,
+  // con los literales exactos y las piezas (Tipo: … · Provincia: …) de las
+  // marcas activas. El mensaje es TEXTO PLANO SIN HTML, así que se pinta con
+  // textContent (nunca innerHTML: acentos, mayúsculas y comillas —«» del
+  // buscador— van tal cual, sin riesgo de inyección)
   if (visibles.length === 0) {
-    let mensaje;
-    if (textoBusqueda.trim() !== "") {
-      mensaje = "No hay coincidencias para «" + escapar(textoBusqueda.trim()) +
-        "». Prueba con otras palabras o con la pestaña «Todos».";
-    } else if (filtroProvincia.trim() !== "") {
-      mensaje = "No hay clientes en «" + escapar(filtroProvincia.trim()) +
-        "». Prueba con «Todas las provincias» o con la pestaña «Todos».";
-    } else if (filtroActivo === "Todos") {
-      mensaje = "Aún no hay clientes. Rellena el formulario de arriba para añadir el primero.";
-      // Migración en 2 clics (spec 011, RF-903): solo en escritorio y solo si al
-      // arrancar NO existía el archivo (sin clientes y sin búsqueda/filtro, que es
-      // este mismo caso). Es un aviso más: no bloquea dar de alta clientes nuevos.
-      if (EN_ESCRITORIO && !archivoInicialExiste && clientes.length === 0) {
-        // Frase fija (sin datos del usuario), pero la pasamos por escapar por costumbre
-        mensaje += " " + escapar("¿Vienes de la web? Exporta la copia allí e impórtala aquí con «Importar».");
-      }
-    } else {
-      mensaje = "No hay clientes de tipo " + escapar(nombreTipo(filtroActivo)) +
-        ". Prueba con la pestaña «Todos».";
+    let mensaje = mensajeEstadoVacio(textoBusqueda, marcasTipos, marcasProvincias, clientes.length);
+
+    // Migración en 2 clics (spec 011, RF-903): la rama de escritorio sin
+    // archivo inicial la decide AQUÍ app.js, SOBRE la rama 3 del RF-1607 (sin
+    // filtros ni búsqueda —misma condición que la lógica pura—): solo en
+    // escritorio y solo si al arrancar NO existía el archivo. Es un aviso más:
+    // no bloquea dar de alta clientes nuevos
+    const sinCriterios = textoBusqueda.trim() === "" &&
+      marcasTipos.length === 0 && marcasProvincias.length === 0;
+    if (sinCriterios && EN_ESCRITORIO && !archivoInicialExiste && clientes.length === 0) {
+      // Frase fija (sin datos del usuario)
+      mensaje += " ¿Vienes de la web? Exporta la copia allí e impórtala aquí con «Importar».";
     }
-    listaClientes.innerHTML = '<p class="vacio-lista">' + mensaje + "</p>";
+
+    const parrafo = document.createElement("p");
+    parrafo.className = "vacio-lista";
+    parrafo.textContent = mensaje;
+    listaClientes.innerHTML = "";
+    listaClientes.appendChild(parrafo);
     return;
   }
 
@@ -1093,6 +1281,5 @@ window.addEventListener("offline", pintarLista);
 
 pintarConmutador();
 pintarChips();
-pintarFiltros();
-pintarFiltroProvincia(); // desplegable con las provincias de arranque (RF-1305)
+repintarFiltros(); // dos paneles con las marcas de arranque ([]) y etiquetas iniciales
 pintarLista();
