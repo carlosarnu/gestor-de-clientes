@@ -14,9 +14,6 @@
     "context7": {
       "type": "remote",
       "url": "https://mcp.context7.com/mcp",
-      "headers": {
-        "CONTEXT7_API_KEY": "[CLAVE_API_ELIMINADA]"
-      },
       "enabled": true
     }
   }
