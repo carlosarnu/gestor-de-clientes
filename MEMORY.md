@@ -40,10 +40,11 @@ Memoria del proyecto entre sesiones. Máximo 50 líneas.
 - ~~Acceso con clave~~ **retirado** (2026-10-13): la web se abre directamente a los clientes; si hace falta protección, vendrá con la app de escritorio.
 - Idioma: identificadores, comentarios, interfaz y documentación en español (constitución regla 5, enmendada 2026-10-13).
 - Tests: lógica pura en `logica.js` con `node --test`; la capa DOM se verifica con Chrome DevTools. Repo git desde 2026-10-13 (`.gitignore` al estilo de MSD, commit inicial `bc3b5f2`).
+- **GitHub (2026-10-25)**: subido a **`carlosarnu/gestor-de-clientes` (público)**, rama `main`, 85 ficheros (sin `dist/` ni `node_modules/`). Antes se **purgó la clave API de Context7 del historial** con `git filter-repo` (entró en el commit `fc8ffa8`); **no salió nunca de este equipo → sin necesidad de rotarla** y `opencode.json` queda trackeado **sin** la cabecera de la clave. Copia de seguridad del historial previo: `Temp\opencode\gestor-de-clientes-backup.bundle`.
 
 ## Ubicación
 - `C:\Users\carlo\Desktop\PROYECTOS\gestor-de-clientes` (siempre se trabaja desde aquí).
-- Archivos de la app: `index.html`, `styles.css`, `logica.js`, `app.js`, `hoja-impresion.css`; tests: `test-*.js` (`node --test`, 141).
+- Archivos de la app: `index.html`, `styles.css`, `logica.js`, `app.js`, `hoja-impresion.css`; tests: `test-*.js` (`node --test`, 166).
 
 ## Próximos pasos
 - Specs **001–018 cerradas** (006 retirada): web y escritorio al día (**166 tests**). **Instalador REGENERADO (2026-10-24, 12:31)** con la 018 dentro (verificado el `win-unpacked`: intersección, hash idéntico, cabecera de impresión con listas) — **copiarlo al USB**. **Pendiente: instalarlo en el ordenador del padre** (sus datos aún sin migrar: «Exportar» en la web → «Importar» en la app) y comprobar allí el cuadro nativo de impresión (aquí no se abre: problema del subsistema de impresión de este equipo). Pendiente de spec: el orden intra-grupo de la pieza «Provincia: …» de la cabecera (la spec pone «Valencia, Castellón» pero el orden es el de marcado/alfabético). Mejoras candidatas: resaltado de coincidencias en el buscador, OpenStreetMap como alternativa sin Google.
